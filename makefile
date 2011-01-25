@@ -2,21 +2,17 @@ CCC=g++
 CC=gcc
 CFLAGS= -O3#-g -Wall
 IFLAGS=-I/sw/include
-LDFLAGS=-L/sw/lib -lglpk -lgmpxx -lgmp
-all: scabble
+LDFLAGS=-L/sw/lib -lglpk -lgmp
+all: scabble3d
 
-scabcc: scabble.cc word.cc rational.cc lp.cc
-	$(CCC) $(CFLAGS) $(IFLAGS) -c scabble.cc word.cc rational.cc lp.cc
+scabc: scabble3d.c matrix.c
+	$(CC) $(CFLAGS) $(IFLAGS) -c scabble3d.c matrix.c `pkg-config --cflags --libs gtk+-2.0`
 
-scabc: matrix.c
-	$(CC) $(CFLAGS) $(IFLAGS) -c matrix.c
-
-scabble: scabcc scabc
+scabble3d: scabc
 	cd exlp-package; make
-	$(CCC) $(CFLAGS) $(IFLAGS) -o scabble scabble.o word.o rational.o matrix.o lp.o exlp-package/*.o $(LDFLAGS)
-
+	$(CCC) $(CFLAGS) $(IFLAGS) -o scabble3d scabble3d.o matrix.o exlp-package/*.o `pkg-config --cflags --libs gtk+-2.0` $(LDFLAGS)
 
 clean: 
-	rm scabble
+	rm scabble3d
 	rm *.o
 	cd exlp-package; rm *.o
