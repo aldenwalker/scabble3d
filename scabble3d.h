@@ -37,16 +37,26 @@ typedef struct {
   int num_verts;
 } vert_list;
 
+
+/*****************************************************************************/
+/* this describes an scl problem (the chains, words, weights, etc)           */
+/*****************************************************************************/
+typedef struct {
+  char*** chains;
+  int num_chains;
+  int* chain_lens;
+  char** all_words;
+  int num_words;
+  int* weights;    //this is a list through all the words
+  RatMat* constraints; //these are the basic constraints
+} scl_problem;
+
 /*****************************************************************************/
 /* this is a particular orthant calculation                                  */
 /*****************************************************************************/
 typedef struct {
   int orthant_num;
-  char*** chains;       //these shouldn't change, so I'm hesitant to make a new type
-  int num_chains;
-  int* chain_lens;
-  RatMat* constraints;  //these give the basic constraints that we add to
-                        //for each triangle
+  scl_problem* scl_prob;
   tri_list* triangles;
   vert_list* vertices;
   double max_undone_triangle_area;
