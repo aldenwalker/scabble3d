@@ -8,7 +8,15 @@
 #include "lp.h"
 
 
-
+/*****************************************************************************/
+/* the data structure for holding all the widget info                        */
+/*****************************************************************************/
+typedef struct {
+  GtkEntry* entry1;
+  GtkEntry* entry2;
+  GtkEntry* entry3;
+  GtkEntry* tol_entry;
+} fieldList;
 
 /*****************************************************************************/
 /* this function takes the basic input from the text boxes and starts it up  */
@@ -68,6 +76,14 @@ void load_inputs_and_run(char* arg1,
     }
   }
   
+  printf("I got the following chains:\n");
+  for (i=0; i<3; i++) {
+    for (j=0; j<chain_lens[i]; j++) {
+      printf("%s ", chains[i][j]);
+    }
+    printf("\n");
+  }
+  
   execution E;
   
   //build the computation -- make initial scl computations, etc
@@ -90,8 +106,29 @@ void update_ball_picture(ball_problem* ball) {
 
 
 
+/*****************************************************************************/
+/* event handling functions:                                                 */
+/*****************************************************************************/
+static gboolean run_button_press(GtkWidget* widget,
+                                 GdkEventButton* event,
+                                 fieldList* fields) {
+  if (strlen((char*)gtk_entry_get_text(fields->entry1)) == 0
+      || strlen((char*)gtk_entry_get_text(fields->entry2)) == 0
+      || strlen((char*)gtk_entry_get_text(fields->entry3)) == 0) {
+    printf("You forot a chain or something\n");
+    return TRUE;
+  }
   
+  double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
   
+  load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
+                      (char*)gtk_entry_get_text(fields->entry1),
+                      (char*)gtk_entry_get_text(fields->entry1),
+                      tolerance,
+                      EXLP);
+  
+  return TRUE;
+}
 
 
 
@@ -189,7 +226,29 @@ int main(int argc, char* argv[]) {
                    "destroy",
                    G_CALLBACK(destroy),
                    NULL);
-                   
+           
+  fieldList fields;
+  fields.entry1 = chain1_entry;
+  fields.entry2 = chain2_entry;
+  fields.entry3 = chain3_entry;
+  fields.tol = tolerance_entry;
+  
+  //run
+  gtk_widget_add_events(run_button, GDK_BUTTON_RELEASE_MASK
+                                  | GDK_BUTTON_PRESS_MASK
+                                  | GDK_LEAVE_NOTIFY_MASK);
+  gtk_signal_connect(GTK_OBJECT(run_button),
+                     "button_press_event",
+                     G_CALLBACK(run_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(run_button),
+                     "button_release_event",
+                     G_CALLBACK(run_button_press),
+                     &fields);
+  
+  
+  
+  
   //show everything
   gtk_widget_show_all(window);  
  
@@ -198,3 +257,11 @@ int main(int argc, char* argv[]) {
   
   return 0;
 }
+
+
+
+
+
+
+
+
