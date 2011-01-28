@@ -6,6 +6,13 @@
 
 
 
+
+
+
+
+
+
+
 static gboolean delete_event(GtkWidget* widget, GdkEvent* event, gpointer data) {
   return FALSE;
 }

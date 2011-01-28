@@ -82,6 +82,38 @@ void rvector_free(rvector* v) {
   v->malloced = 0;
 }
 
+void rvector_dot(mpq_t ans, rvector* v1, rvector* v2) {
+  int i;
+  mpq_t temp;
+  mpq_init(temp);
+  mpq_set_si(ans, 0, 1);
+  for (i=0; i<v1->dim; i++) {
+    mpq_mul(temp, v1->coord[i], v2->coord[i]);
+    mpq_add(ans, ans, temp);
+  }
+  mpq_clear(temp);
+}
+
+void rvector_cross(rvector* c, rvector* v1, rvector* v2) {
+  mpq_t temp;
+  mpq_init(temp);
+  
+  mpq_mul(c->coord[0], v1->coord[1], v2->coord[2]);
+  mpq_mul(temp, v1->coord[2], v2->coord[1]);
+  mpq_sub(c->coord[0], c->coord[0], temp);
+  
+  mpq_mul(c->coord[1], v1->coord[2], v2->coord[0]);
+  mpq_mul(temp, v1->coord[0], v2->coord[2]);
+  mpq_sub(c->coord[1], c->coord[1], temp);
+  
+  mpq_mul(c->coord[2], v1->coord[0], v2->coord[1]);
+  mpq_mul(temp, v1->coord[1], v2->coord[0]);
+  mpq_sub(c->coord[2], c->coord[2], temp);
+  
+  mpq_clear(temp);
+}
+  
+
 void vert_list_add_copy(vert_list* V, rvector* v) {
   int i;
   V->num_verts ++;
@@ -93,7 +125,7 @@ void vert_list_add_copy(vert_list* V, rvector* v) {
 }
 
   
-  
+
   
   
                           

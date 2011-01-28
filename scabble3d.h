@@ -1,4 +1,19 @@
 
+/*****************************************************************************/
+/* these are the arc and polygon types                                       */
+/*****************************************************************************/
+typedef struct {
+  int first_word;
+  int last_word;
+  int first;
+  int last;
+} arc;
+
+typedef struct {
+  int* arc;
+  int num_arcs;
+} polygon;
+
 
 /*****************************************************************************/
 /* this is a (3d probably) rational vector                                   */
@@ -49,6 +64,11 @@ typedef struct {
   int num_words;
   int* weights;    //this is a list through all the words
   RatMat* constraints; //these are the basic constraints
+  int* equality_type;  //
+  arc* arc_list;
+  int num_arcs;
+  polygon* poly_list;
+  int num_polys;
 } scl_problem;
 
 /*****************************************************************************/

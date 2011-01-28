@@ -11,16 +11,288 @@
 #include "ball_worker.h"
 
 
+
+
+
+/*****************************************************************************/
+/* compute the scl of a particular point in the span of the three (or        */
+/* however many) chains                                                      */
+/*****************************************************************************/
+void point_scl(scl_problem* scl_prob,
+               rvector* point,
+               mpq_t scl,
+               scallop_lp_solver solver) {
+  int i,j,k;
+  int first_word_index;
+  mpq_t* coef = (mpq_t*)malloc(3*sizeof(mpq_t));
+  for (i=0; i<3; i++) {
+    mpq_init(coef[i]);
+  }
+  mpq_t temp_mpq;
+  mpq_init(temp_mpq);
+  
+  RatMat_change_num_rows(scl_prob->constraints, 
+                         scl_prob->constraints->nR+3);
+  scl_prob->equality_type = (int*)realloc((void*)(scl_prob->equality_type),
+                                          scl_prob->constraints->nR);
+  
+  for (i=0; i<scl_prob->num_polys; i++) {
+    for (j=0; j<3; j++) {
+      mpq_set_si(coef[j], 0, 1);
+    }
+    for (j=0; j<scl_prob->poly_list[i].num_arcs; j++) {
+      first_word_index = 0;
+      for (k=0; k<3; k++) {
+        if (scl_prob->arc_list[scl_prob->poly_list[i].arc[j]].first_word == first_word_index
+            && scl_prob->arc_list[scl_prob->poly_list[i].arc[j]].first == 0) {
+          mpq_set_si(temp_mpq, 1, weights[first_word_index]);
+          mpq_add(coef[k], coef[k], temp_mpq);
+        }
+        first_word_index += scl_prob->chain_lens[k];
+      }
+    }
+    for (j=0; j<3; j++) {
+      RatMat_set(scl_prob->constraints,
+                 scl_prob->constraints->nR-(1+j),
+                 i,
+                 coef[j]);
+    }
+  }
+  
+  //set the RHS for these rows
+  for (i=0; i<3; i++) {
+    RatMat_set(scl_prob->constraints, 
+               scl_prob->constraints->nR-(1+j),
+               scl_prob->constraints->nC-1,
+               point->coord[i]);
+    scl_prob->equality_type[scl_prob->constraints->nR-(1+j)] = 0;
+  }
+  
+  //do the linear program
+  rvecctor solution_vector;
+  rvector_init(&solution_vector, scl_prob->constraints->nC-1);
+  
+  linear_program_from_ratmat(scl_prob->poly_list, 
+                             &solution_vector,
+                             scl,
+                             scl_prob->constraints,
+                             scl_prob->equality_type,
+                             solver);
+  
+  //get rid of the extra stuff we added
+  RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR-3);
+  scl_prob->equality_type = (int*)realloc((void*)(scl_prob->equality_type),
+                                          scl_prob->constraints->nR);
+  mpq_clear(temp_mpq);
+  for (i=0; i<3; i++) {
+    mpq_clear(coef[i]);
+  }
+  free(coef);
+  rvector_free(&solution_vector);
+}
+               
+          
+               
+
+
+
+
 /*****************************************************************************/
 /* compute the minimum scl over a triangle.  if scl is linear over the       */
 /* triangle (so its min is 1), this returns 1.  Note this assume that the    */
 /* vertices of the triangle have scl = 1                                     */
 /*****************************************************************************/
-int min_scl_over_triangle(scl_problem* orth->scl_prob, 
+int min_scl_over_triangle(scl_problem* scl_prob, 
                           vert_list* V,
                           triangle* t,
-                          mpq_t scl_ans,
-                          rvector* optimal_vector) {
+                          rvector* new_vertex,
+                          scallop_lp_solver solver) {
+  int i,j,k,l;
+  int first_word_index;
+  mpq_t temp_mpq;
+  mpq_init(temp_mpq);
+  mpq_t coef;
+  mpq_init(coef);
+  
+  //we need to add the constraints for both the hyperplane and for the 
+  //triangle (3 for the triangle)
+  
+  /************* hyperplane **************************************************/
+  RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR+1);
+  
+  rvector spanning_vector1;
+  rvector spanning_vector2;
+  rvector normal_vector;
+  mpq_t normal_value;
+  rvector_init(&spanning_vector1, 3);
+  rvector_init(&spanning_vector2, 3);
+  rvector_init(&normal_vector, 3);
+  mpq_init(normal_value);
+  
+  rvector_sub(&spanning_vector1, &(V->verts[t->verts[1]]), &(V->verts[t->verts[0]]));
+  rvector_sub(&spanning_vector2, &(V->verts[t->verts[2]]), &(V->verts[t->verts[0]]));
+  rvector_cross(&normal_vector, &spanning_vector1, &spanning_vector2);
+  rvector_dot(normal_value, &normal_vector, &(V->verts[t->verts[0]]));
+  
+  //now go through the polygons and say that the image in the 3d space, dotted
+  //with normal_vector, gives normal_value
+  for (i=0; i<scl_prob->num_polys; i++) {
+    mpq_set_si(coef, 0, 1);
+    for (j=0; j<scl_prob->poly_list[i].num_arcs; j++) {
+      first_word_index = 0;
+      for (k=0; k<scl_prob->num_chains; k++) {
+        if (scl_prob->arc_list[scl_prob->poly_list[i].arc[j]].first_word == first_word_index
+            && scl_prob->arc_list[scl_prob->poly_list[i].arc[j]].first == 0) {
+          mpq_set_si(temp_mpq, scl_prob->weights[first_word_index]);
+          mpq_div(temp_mpq, normal_vector.coord[k], temp_mpq);
+          mpq_add(coef, coef, temp_mpq);
+        }
+        first_word_index += scl_prob->chain_lens[k];
+      }
+    }
+    RatMat_set(scl_prob->constraints, scl_prob->constraints->nR-1, i, coef);
+  }
+  RatMat_set(scl_prob->constraints, 
+             scl_prob->constraints->nR-1, 
+             scl_prob->constraints->nC-1, 
+             normal_value);
+  scl_prob->equality_type = (int*)realloc((void*)(scl_prob->equality_type),
+                                          scl_prob->constraints->nR*sizeof(int));
+  scl_prob->equality_type[scl_prob->constraints->nR-1] = 0;
+  
+  
+  /*********************** inequality constraints ****************************/
+  //we need to cut with hyperplanes which cut out the triangle
+  
+  rvector parallel_vector;
+  mpq_t parallel_value1;
+  mpq_t parallel_value2;
+  revector_init(parallel_vector);
+  mpq_init(parallel_value1);
+  mpq_init(parallel_value2);
+  
+  for (i=0; i<3; i++) {
+    
+    RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR+2);
+    
+    rvector_sub(&spanning_vector1, 
+                &(V->verts[t->verts[(i+1)%3]]), 
+                &(V->verts[t->verts[i]]));
+    rvector_cross(parallel_vector, normal_vector, spanning_vector1);
+    rvector_dot(parallel_value1, parallel_vector, &(V->verts[t->verts[i]]));
+    rvector_dot(parallel_value2, parallel_vector, &(V->verts[t->verts[(i+2)%3]]));
+    
+    if (mpq_cmp(parallel_value1, parallel_value2) > 0) {
+      mpq_swap(parallel_value1, parallel_value2);
+    }
+    
+    for (j=0; j<scl_prob->num_polys; j++) {
+      mpq_set_si(coef, 0, 1);
+      for (k=0; k<scl_prob->polys[j].num_arcs; k++) {
+        first_word_index = 0;
+        for (l=0; l<scl_prob->num_chains; l++) {
+          if (scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first_word == first_word_index
+              && scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first == 0) {
+            mpq_set_si(temp_mpq, scl_prob->weights[first_word_index]);
+            mpq_div(temp_mpq, parallel_vector.coord[l], temp_mpq);
+            mpq_add(coef, coef, temp_mpq);
+          }
+          first_word_index += scl_prob->chain_lens[l];
+        }
+      }
+      RatMat_set(scl_prob->constraints, scl_prob->constraints->nR-2, j, coef);
+      mpq_neg(coef, coef);
+      RatMat_set(scl_prob->constraints, scl_prob->constraints->nR-1, j, coef);
+      scl_prob->equality_type = (int*)realloc((void*)(scl_prob->equality_type),
+                                              scl_prob->constraints->nR*sizeof(int));
+      scl_prob->equality_type[scl_prob->constraints->nR-2] = -1;
+      scl_prob->equality_type[scl_prob->constraints->nR-1] = -1;
+    }
+    //set the right hand side for these two rows
+    RatMat_set(scl_prob->constraints, 
+               scl_prob->constraints->nR-2, 
+               scl_prob->constraints->nC-1,
+               parallel_value2);
+    mpq_neg(parallel_value1, parallel_value1);
+    RatMat_set(scl_prob->constraints, 
+               scl_prob->constraints->nR-2, 
+               scl_prob->constraints->nC-1,
+               parallel_value1);
+  }
+  
+  
+  /**************** linear programming ***************************************/
+  rvector solution_vector;
+  rvector_init(&solution_vector, scl_prob->constraints->nC-1);
+  mpq_t scl;
+  mpq_init(scl);
+  
+  linear_program_from_ratmat(scl_prob->poly_list, 
+                             &solution_vector,
+                             scl,
+                             scl_prob->constraints,
+                             scl_prob->equality_type,
+                             solver);
+  
+  
+  /***************** read solution vector ************************************/
+  for (i=0; i<3; i++) {
+    mpq_set_si(new_vertex->coord[i], 0, 1);
+  }
+  
+  if (0==mpq_cmp_si(scl, 1, 1)) {
+    goto FREE_EVERYTHING;
+  }
+  
+  for (i=0; i<scl_prob->num_polys; i++) {
+    for (j=0; j<scl_prob->poly_list[i].num_arcs; j++) {
+      first_word_index = 0;
+      for (k=0; k<3; k++) {
+        if (scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first_word == first_word_index
+            && scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first == 0) {
+          mpq_set_si(temp_mpq, scl_prob->weights[first_word_index]);
+          mpq_div(temp_mpq, solution_vector->coord[i], temp_mpq);
+          mpq_add(new_vertex->coord[k], new_vertex->coord[k], temp_mpq);
+        }
+        first_word_index += scl_prob->chain_lens[k];
+      }
+    }
+  }
+  
+  //now scale so that the point has scl =1
+  for (i=0; i<3; i++) {
+    mpq_set_si(temp_mpq, 1, 1);
+    mpq_div(temp_mpq, temp_mpq, scl);
+    mpq_mul(new_vertex->coord[i], new_vertex->coord[i], temp_mpq);
+  }
+  
+  //remove those rows and stuff
+  RatMat_change_num_rows(scl_prob->constraints, 
+                         scl_prob->constraints->nR-(2*3+1));
+  scl_prob->equality_type = (int*)realloc((void*)(scl_prob->equality_type),
+                                          scl_prob->constraints->nR*sizeof(int));
+  
+  
+FREE_EVERYTHING:
+  mpq_clear(temp_mpq);
+  mpq_clear(coef);
+  mpq_clear(normal_value);
+  mpq_clear(parallel_value1);
+  mpq_clear(parallel_value2);
+  rvector_free(spanning_vector1);
+  rvector_free(spanning_vector2);
+  rvector_free(normal_vector);
+  rvector_free(solution_vector);
+  
+  if (mpq_cmp_si(scl, 1, 1)==0) {
+    mpq_clear(scl);
+    return 1;
+  } else {
+    mpq_clear(scl);
+    return 0;
+  }
+
+      
 }
 
 
