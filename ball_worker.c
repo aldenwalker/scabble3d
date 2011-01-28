@@ -562,8 +562,159 @@ void run_execution(execution* E) {
 
 
 
+/*****************************************************************************/
+/* initializes an orthant problem                                            */
+/*****************************************************************************/
+void init_orthant_problem(orthant_problem* orth, 
+                          int index, 
+                          char*** chains, 
+                          int* chain_lens,
+                          int* weights,
+                          int num_words,
+                          scallop_lp_solver solver) {
+  int i,j,k;
+  char*** these_chains = (char***)malloc(3*sizeof(char**));
+  char** all_words = NULL;
+  for (i=0; i<3; i++) {
+    these_chains[i] = (char**)malloc(chain_lens[i]*sizeof(char*));
+    for (j=0; j<chain_lens[i]; j++) {
+      these_chains[i][j] = (char*)malloc((strlen(chains[i][j])+1)*sizeof(char));
+      strcpy(these_chains[i][j], chains[i][j]);
+      if (((index>>i)&1)==1) {
+        invert(these_chains[i][j]);
+      }
+    }
+  }
+  int index_in_words = 0;
+  all_words = (char**)malloc(num_words*sizeof(char*));
+  for (i=0; i<num_chains; i++) {
+    for (j=0; j<chain_lens[i]; j++) {
+      all_words[idex_in_words] = (char*)malloc((strlen(chains[i][j])+1)*sizeof(char));
+    }
+  }
+  
+  orth->scl_prob = (scl_problem*)malloc(sizeof(scl_problem));
+  
+  scl_problem_init(orth->scl_prob, 
+                   these_chains, 
+                   3, 
+                   chain_lens, 
+                   all_words, 
+                   num_words, 
+                   weights, 
+                   maxjun);
+ 
+  orth->orthant_num = index;
+  orth->is_complete = 0;
+  orth->triangles = (tri_list*)malloc(sizeof(tri_list));
+  orth->triangles->tris = (triangle*)malloc(sizeof(triangle));
+  orth->triangles->first_nonlinear_triangle = 0;
+  orth->triangles->num_tris = 1;
+  orth->triangles->tris[0].verts = (int*)malloc(3*sizeof(int));
+  orth->triangles->tris[0].verts[0] = 0;
+  orth->triangles->tris[0].verts[1] = 1;
+  orth->triangles->tris[0].verts[2] = 2;
+  orth->vertices = (vert_list*)malloc(sizeof(vert_list));
+  orth->vertices->verts = NULL;
+  orth->vertices->num_verts = 0;
+  
+  mpq_t scl;
+  mpq_init(scl);
+  rvector point;
+  rvector_init(&point, 3);
+  for (i=0; i<3; i++) {
+    mpq_set_si(point.coord[0], (i==0?1:0), 1);
+    mpq_set_si(point.coord[1], (i==1?1:0), 1);
+    mpq_set_si(point.coord[2], (i==2?1:0), 1);
+    point_scl(orth->scl_prob,
+              point,
+              scl,
+              solver);
+    for (j=0; j<3; j++) {
+      mpq_div(point.coord[j], point.coord[j], scl);
+    }
+    vert_list_add_copy(point);
+  }
+  
+  //now we have one triangle set up
+  free(all_words);
+  for (i=0; i<3; i++) {
+    for (j=0; j<chain_lens[i]; j++) {
+      free(these_chains[i][j]);
+    }
+  }
+}
+  
+ 
 
 
+/*****************************************************************************/
+/* this functions sets up the whole computation                              */
+/* this probably won't run in a separate thread                              */
+/*****************************************************************************/
+void init_computation(execution* E,
+                      chains*** chains,
+                      int* chain_lens,
+                      int* weights,
+                      int num_words,
+                      double tolerance,
+                      scallop_lp_solver solver) {
+  int i;
+  //set up the execution structure
+  E->status = 0;
+  E->status_message = 0;
+  E->new_tolerance_check = 0;
+  E->skip_orthant = 0;
+  E->ball = (ball_problem*)malloc(sizeof(ball_problem));
+  E->ball->tolerance = tolerance;
+  E->ball->num_chains = 3;
+  E->ball->chain_lens = (int*)malloc(3*sizeof(int));
+  for (i=0; i<3; i++) {
+    E->ball->chain_lens[i] = chain_lens[i];
+  }
+  E->ball->is_complete = 0;
+  E->orthants = (orthant_problem**)malloc(4*sizeof(orthant_problem*));
+  for (i=0; i<4; i++) {
+    E->orthants[i] = (orthant_problem*)malloc(sizeof(orthant_problem));
+    init_orthant_problem(E->orthants[i], i, chains, chain_lens, weights, num_words, solver);
+  }
+}
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
          
          

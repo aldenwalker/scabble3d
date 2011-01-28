@@ -150,17 +150,15 @@ void generate_polygons(char** word_list,
 /* this function works for 2d *and* 3d (actually, for any d)                 */
 /*****************************************************************************/
 void create_constraint_matrix(char*** chains, 
+                              int num_chains,
+                              int* chain_lens,
                               arc* arc_list,
                               int num_arcs,
                               polygon* polygon_list,
                               int num_polys,
                               int* weights,
                               RatMat* constraints,
-                              int* equalityType) {
-  
-  int arc_list_length = arc_list.size();
-  int polygon_list_length = polygon_list.size();
-  int numChains = chains.size();
+                              int** equalityType) {
   int totalNumWords = 0;
   int offset;  // as we build the matrix, we use this for sanity
   int i,j,k,l;
@@ -171,7 +169,7 @@ void create_constraint_matrix(char*** chains,
   int coefMyWord;
   
   for (i=0; i<numChains; i++) {
-    totalNumWords += chains[i].size();
+    totalNumWords += chain_lens[i];
   }
   
   
@@ -184,9 +182,10 @@ void create_constraint_matrix(char*** chains,
    - the chains, saying that the boundary decomposes as ag + bh
    The last column is the b vector, as in Ax <= b is the polyhedron
    */
-  RatMat_init(constraints,  arc_list_length/2 + totalNumWords - numChains, 
-              polygon_list_length + 1);
-  equalityType.resize(arc_list_length/2 + totalNumWords - numChains);
+  RatMat_init(constraints,  
+              num_arcs/2 + totalNumWords - num_chains, 
+              num_polys + 1);
+  (*equalityType) = (int*)malloc((num_arcs/2 + totalNumWords - num_chains)*sizeof(int));
   
   RatMat_reset_int(constraints, 0);
   
@@ -202,11 +201,11 @@ void create_constraint_matrix(char*** chains,
   offset = 0;
   
   //each arc must appear the same number of times coming and going
-  for (i=0; i<arc_list_length/2; i++) {  //for each arc
-    for (j=0; j<polygon_list_length; j++) {  //for each polygon
+  for (i=0; i<num_arcs/2; i++) {  //for each arc
+    for (j=0; j<num_polys; j++) {  //for each polygon
       //count the number of times the arc appears in the polygon, with signs
       n=0;
-      for (k=0; k<polygon_list[j].size; k++) {  // for each arc in the polygon
+      for (k=0; k<polygon_list[j].num_arcs; k++) {  // for each arc in the polygon
         if(polygon_list[j].arc[k]==2*i){
           n=n+1;
         }
@@ -217,25 +216,25 @@ void create_constraint_matrix(char*** chains,
       // n is now the coefficient in the offset+i row and jth column
       RatMat_set_int(constraints, offset+i, j, n, 1);
     }
-    equalityType[offset+i] = 0;
+    (*equalityType)[offset+i] = 0;
     // note that these rows are == 0, which the last entry in the jth row already is
   }
   
-  offset += arc_list_length/2;
+  offset += num_arcs/2;
   
   //each chain must appear as one -- that if we have aw + bv, they must appear
   //as caw + cbv = c(aw+bv) (if the weights are 1, then just the same # of times)
   
   firstWordNumber = 0; //note this is a running total through all words
   for (i=0; i<numChains; i++) { //for each chain
-    for (j=1; j<(int)chains[i].size(); j++) {  //for each word past the first one
+    for (j=1; j<chain_lens[i]; j++) {  //for each word past the first one
       myWordNumber = firstWordNumber + j;
-      for (k=0; k<polygon_list_length; k++) { //for each polygon
+      for (k=0; k<num_polys; k++) { //for each polygon
         //the number of times our word appears, divided by its weight is the same
         //as the number of times that the first word appears, divided by its weight
         coefFirstWord = 0;
         coefMyWord = 0;
-        for (l=0; l<polygon_list[k].size; l++) {
+        for (l=0; l<polygon_list[k].num_arcs; l++) {
           if (arc_list[polygon_list[k].arc[l]].first_word == myWordNumber &&
               arc_list[polygon_list[k].arc[l]].first == 0 ) { //for each copy of the word, this is 1
             coefMyWord ++;
@@ -250,14 +249,91 @@ void create_constraint_matrix(char*** chains,
                        weights[firstWordNumber]*coefMyWord - weights[myWordNumber]*coefFirstWord,
                        weights[myWordNumber]*weights[firstWordNumber]);
       }
-      equalityType[offset] = 0;
+      (*equalityType)[offset] = 0;
       //again, the right hand side is 0, so we don't need to set it
       offset++;
     }
-    firstWordNumber += chains[i].size();
+    firstWordNumber += chain_lens[i];
   }  
   
 }
+
+
+/****************************************************************************/
+/* find the arcs, polygons, and constraints, given a bunch of chains        */
+/****************************************************************************/
+void scl_problem_init(scl_problem* scl_prob, 
+                      char*** chains,
+                      int num_chains,
+                      int* chain_lens,
+                      char** word_list,
+                      int num_words,
+                      int* weights,
+                      int maxjun) {
+  int i;
+  scl_prob->arc_list = NULL;
+  scl_prob->poly_list = NULL;
+  scl_prob->constraints = (RatMat*)malloc(sizeof(RatMat));
+  
+  //copy everything
+  scl_prob->chains = (char***)malloc(num_chains*sizeof(char**));
+  scl_prob->num_chains = num_chains;
+  scl_prob->chain_lens = (int*)malloc(num_chains*sizeof(int));
+  for (i=0; i<num_chains; i++) {
+    scl_prob->chain_lens[i] = chain_lens[i];
+    scl_prob->chains[i] = (char**)malloc(chain_lens[i]*sizeof(char*));
+    for (j=0; j<chain_lens[i]; j++) {
+      scl_prob->chains[i][j] = (char*)malloc((strlen(chains[i][j])+1)*sizeof(char));
+      strcpy(scl_prob->chains[i][j], chains[i][j]);
+    }
+  }
+  
+  scl_prob->word_list = (char**)malloc(num_words*sizeof(char*));
+  scl_prob->num_words = num_words;
+  scl_prob->weights = (int*)malloc(num_words*sizeof(int));
+  for (i=0; i<num_words; i++) {
+    scl_prob->word_list[i] = (char*)malloc((strlen(word_list[i])+1)*sizeof(char));
+    strcpy(scl_prob->word_list[i], word_list[i]);
+    scl_prob->weights[i] = weights[i];
+  }
+  
+  generate_arcs(&(scl_prob->arc_list), &(scl_prob->num_arcs), 
+                scl_prob->word_list, scl_prob->num_words);
+  
+  generate_polygons(word_list, num_words,
+                    arc_list, num_arcs,
+                    &(scl_prob->poly_list), &(scl_prob->num_polys),
+                    maxjun);
+  
+  create_constraint_matrix(chains, num_chains, chain_lens,
+                           arc_list, num_arcs,
+                           poly_list, num_polys, 
+                           weights, scl_prob->constraints, &(scl_prob->equality_type));
+                           
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
