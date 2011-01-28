@@ -11,6 +11,17 @@
 #include "ball_worker.h"
 
 
+/*****************************************************************************/
+/* compute the minimum scl over a triangle.  if scl is linear over the       */
+/* triangle (so its min is 1), this returns 1.  Note this assume that the    */
+/* vertices of the triangle have scl = 1                                     */
+/*****************************************************************************/
+int min_scl_over_triangle(scl_problem* orth->scl_prob, 
+                          vert_list* V,
+                          triangle* t,
+                          mpq_t scl_ans,
+                          rvector* optimal_vector) {
+}
 
 
 /*****************************************************************************/
@@ -135,10 +146,11 @@ int one_orthant_step(orthant_problem* orth, double tolerance) {
   }
   
   //so this triangle can be worked
-  rvector_init(&temp_vert);
+  rvector_init(&temp_vert, 3);
   mpq_init(min_scl);
   
   its_linear = min_scl_over_triangle(orth->scl_prob, 
+                                     orth->vertices,
                                      &(orth->triangles->tris[i])
                                      min_scl,
                                      &temp_vert);
@@ -162,7 +174,7 @@ int one_orthant_step(orthant_problem* orth, double tolerance) {
   }
   
   //add it to the vertex list
-  vert_list_add(orth->vertices, &temp_vert);
+  vert_list_add_copy(orth->vertices, &temp_vert);
   
   //now, split the triangles
   split_triangles(orth->vertices,
@@ -171,6 +183,8 @@ int one_orthant_step(orthant_problem* orth, double tolerance) {
                   orth->vertices->num_verts - 1);
   
   //we are now done with this step
+  rvector_free(&temp_vert);
+  mpq_clear(min_scl);
   return 0;
 }
 

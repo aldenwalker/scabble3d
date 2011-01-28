@@ -45,6 +45,53 @@ void tri_list_add_copy(tri_list* T, triangle* t) {
 }
 
 
+void tri_list_delete_index(tri_list* T, int index) {
+  int i;
+  free(T->tris[index].verts);
+  for (i = index; i<T->num_tris-1; t++) {
+    T->tris[i] = T->tris[i+1];
+  }
+  T->num_tris--;
+  T->tris = (triangle*)realloc((void*)(T->tris),
+                               (T->num_tries)*sizeof(triangle));
+}
+
+void tri_list_delete_indices(tri_list* T, int ind1, int ind2) {
+  int min_ind = (ind1 > ind2 ? ind2 : ind2);
+  int max_ind = (ind1 > ind2 ? ind1 : ind2);
+  tri_list_delete_index(T, max_ind);
+  tri_list_delete_index(T, min_ind);
+}
+
+void revector_init(rvector* v, int len) {
+  v->coord = (mpq_t*)malloc(len*sizeof(mpq_t));
+  int i;
+  for (i=0; i<len; i++) {
+    mpq_init(v->coord[i]);
+  }
+  v->dim = len;
+  v->malloced = 1;
+}
+
+void rvector_free(rvector* v) {
+  int i;
+  for (i=0; i<v->dim; i++) {
+    mpq_clear(v->coord[i]);
+  }
+  free(v->coord);
+  v->malloced = 0;
+}
+
+void vert_list_add_copy(vert_list* V, rvector* v) {
+  int i;
+  V->num_verts ++;
+  V->verts = (rvector*)malloc((V->num_verts)*sizeof(rvector));
+  rvector_init(V->verts[V->num_verts-1], v->dim);
+  for (i=0; i<v->dim; i++) {
+    mpq_set(V->verts[V->num_verts-1].coord[i], v->coord[i]);
+  }
+}
+
   
   
   
