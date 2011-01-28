@@ -636,6 +636,9 @@ void init_orthant_problem(orthant_problem* orth,
     vert_list_add_copy(point);
   }
   
+  orth->triangles->tris[0].area = triangle_area(orth->vertices, orth->triangles->tris);
+  orth->triangles->tris[0].is_scl_linear = 0;
+  
   //now we have one triangle set up
   free(all_words);
   for (i=0; i<3; i++) {
@@ -643,6 +646,9 @@ void init_orthant_problem(orthant_problem* orth,
       free(these_chains[i][j]);
     }
   }
+  mpq_clear(scl);
+  rvector_free(&point);
+  
 }
   
  

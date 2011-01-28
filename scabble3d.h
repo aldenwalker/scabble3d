@@ -1,3 +1,10 @@
+#ifndef __scabble3d__
+#define __scabble3d__
+
+#include <gmp.h>
+#include <semaphore.h>
+
+#include "matrix.h"
 
 /*****************************************************************************/
 /* these are the arc and polygon types                                       */
@@ -125,7 +132,7 @@ typedef struct {
   
   
   
-
+#endif
 
 
 

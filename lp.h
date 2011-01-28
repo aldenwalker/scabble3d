@@ -1,3 +1,4 @@
+
 /*
  *  lp.h
  *  
@@ -5,8 +6,12 @@
  *
  */
 
+#ifndef __lp__
+#define __lp__
+
 #include <gmp.h>
 #include "scabble3d.h"
+#include "matrix.h"
 
 
 
@@ -19,4 +24,6 @@ void linear_program_from_ratmat(polygon* poly_list,
                                 mpq_t scl,
                                 RatMat* constraints,
                                 int* equality_type,
-                                scallop_lp_solver solver)
+                                enum scallop_lp_solver solver);
+
+#endif

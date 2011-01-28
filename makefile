@@ -1,6 +1,6 @@
 CCC=g++
 CC=gcc
-CFLAGS= -O3#-g -Wall
+CFLAGS= -g -Wall
 IFLAGS=-I/sw/include
 LDFLAGS=-L/sw/lib -lglpk -lgmp
 all: scabble3d
