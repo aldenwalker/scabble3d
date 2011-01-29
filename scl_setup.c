@@ -6,7 +6,7 @@
  */
 
 #include "scl_setup.h"
-
+#include "matrix.h"
 
 /*****************************************************************************/
 /* these compute the arcs and polygons                                       */

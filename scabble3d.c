@@ -4,9 +4,12 @@
 #include <gmp.h>
 
 #include <gtk/gtk.h>
+
 #include "scabble3d.h"
 #include "lp.h"
-
+#include "triangle_and_vertex.h"
+#include "matrix.h"
+#include "scl_setup.h"
 
 /*****************************************************************************/
 /* the data structure for holding all the widget info                        */
@@ -40,14 +43,22 @@ void load_inputs_and_run(char* arg1,
     chain_lens[i] = 0;
     prev_j = 0;
     j=1;
-    while (args[i][j] != '\0') {
-      if (args[i][j] == ' ') {
+    while (1) {
+      if (args[i][j] == ' ' || args[i][j] == '\0') {
         num_words++;
         chain_lens[i] ++;
+        if (args[i][j] == '\0') {
+          break;
+        }
       }
       j++;
     }
   }
+  
+  printf("Called with: %s, %s, %s,\n", arg1, arg2, arg3);
+  printf(" = %s, %s, %s, \n", args[0], args[1], args[2]);
+  printf("I found chain lens: %d, %d, %d\n", chain_lens[0], chain_lens[1], chain_lens[2]);
+  printf("For a total of %d words\n", num_words);
   
   weights = (int*)malloc(num_words*sizeof(int));
   current_total_word = 0;
@@ -59,9 +70,11 @@ void load_inputs_and_run(char* arg1,
     prev_j = 0;
     j = 1;
     while (1) {
+      //printf("prev_j = %d, j = %d\n", prev_j, j);
       if (args[i][j] == ' ' || args[i][j] == '\0') {
+        //printf("Found a breakpoint at %d -- %d\n", prev_j, j);
         chains[i][current_word] = (char*)malloc((j-prev_j+1)*sizeof(char));
-        strncpy(chains[i][current_word], args[i]+prev_j, (j-prev_j));
+        strncpy(chains[i][current_word], &(args[i][prev_j]), (j-prev_j));
         chains[i][current_word][j-prev_j] = '\0';
         weights[current_total_word] = 1;
         current_total_word++;
@@ -72,6 +85,8 @@ void load_inputs_and_run(char* arg1,
         } else {
           break;
         }
+      } else {
+        j++;
       }
     }
   }
@@ -115,15 +130,15 @@ static gboolean run_button_press(GtkWidget* widget,
   if (strlen((char*)gtk_entry_get_text(fields->entry1)) == 0
       || strlen((char*)gtk_entry_get_text(fields->entry2)) == 0
       || strlen((char*)gtk_entry_get_text(fields->entry3)) == 0) {
-    printf("You forot a chain or something\n");
+    printf("You forgot a chain or something\n");
     return TRUE;
   }
   
   double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
   
   load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
-                      (char*)gtk_entry_get_text(fields->entry1),
-                      (char*)gtk_entry_get_text(fields->entry1),
+                      (char*)gtk_entry_get_text(fields->entry2),
+                      (char*)gtk_entry_get_text(fields->entry3),
                       tolerance,
                       EXLP);
   
@@ -228,10 +243,10 @@ int main(int argc, char* argv[]) {
                    NULL);
            
   fieldList fields;
-  fields.entry1 = chain1_entry;
-  fields.entry2 = chain2_entry;
-  fields.entry3 = chain3_entry;
-  fields.tol = tolerance_entry;
+  fields.entry1 = GTK_ENTRY(chain1_entry);
+  fields.entry2 = GTK_ENTRY(chain2_entry);
+  fields.entry3 = GTK_ENTRY(chain3_entry);
+  fields.tol_entry = GTK_ENTRY(tolerance_entry);
   
   //run
   gtk_widget_add_events(run_button, GDK_BUTTON_RELEASE_MASK
