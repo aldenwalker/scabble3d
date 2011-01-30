@@ -7,6 +7,10 @@
  *
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "word.h"
 
 
@@ -33,13 +37,12 @@ void  invert(char* s) {
     s[sl-i-1] = temp;
   }
   swapCase(s);
-  return s;
 }
 
 void red(char* s) {			// reduce by cancelling adjacent inverse letters
 	int i,a,b;
 	i=0;
-  int ij;
+  int j;
 	while(i<=(int)strlen(s)){
 		if(i>0){
 			a = (int) s[i-1];

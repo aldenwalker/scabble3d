@@ -1,15 +1,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <gmp.h>
+#include <semaphore.h>
+#include <pthread.h>
 
 #include <gtk/gtk.h>
+#include <gmp.h>
 
-#include "scabble3d.h"
-#include "lp.h"
+
 #include "triangle_and_vertex.h"
 #include "matrix.h"
-#include "scl_setup.h"
+#include "scl_backend.h"
 
 /*****************************************************************************/
 /* the data structure for holding all the widget info                        */
@@ -28,6 +29,7 @@ void load_inputs_and_run(char* arg1,
                          char* arg2, 
                          char* arg3, 
                          double tolerance,
+                         int maxjun,
                          enum scallop_lp_solver solver) {
   char*** chains = (char***)malloc(3*sizeof(char**));
   int i;
@@ -102,7 +104,10 @@ void load_inputs_and_run(char* arg1,
   execution E;
   
   //build the computation -- make initial scl computations, etc
-  //init_computation(&E, chains, chain_lens, weights, num_words, tolerance, solver);
+  computation_init(&E, chains, chain_lens, weights, num_words, tolerance, maxjun, solver);
+  
+  printf("Done computation init -- about to start pthread\n");
+  
   
   //start the multi-threadedness
   //PTHREADs
@@ -113,7 +118,12 @@ void load_inputs_and_run(char* arg1,
 /*****************************************************************************/
 /* this function draws the polygon ball                                      */
 /*****************************************************************************/
-void update_ball_picture(ball_problem* ball) {
+void update_ball_picture_while_running(execution* E) {
+  
+  printf("Hey I'm drawing the ball now\n");
+  
+  
+  sem_post(&(E->read_data_sem));
   
 
 }
@@ -127,20 +137,25 @@ void update_ball_picture(ball_problem* ball) {
 static gboolean run_button_press(GtkWidget* widget,
                                  GdkEventButton* event,
                                  fieldList* fields) {
-  if (strlen((char*)gtk_entry_get_text(fields->entry1)) == 0
-      || strlen((char*)gtk_entry_get_text(fields->entry2)) == 0
-      || strlen((char*)gtk_entry_get_text(fields->entry3)) == 0) {
-    printf("You forgot a chain or something\n");
-    return TRUE;
+  
+  if (event->type == GDK_BUTTON_RELEASE) {
+    
+    if (strlen((char*)gtk_entry_get_text(fields->entry1)) == 0
+        || strlen((char*)gtk_entry_get_text(fields->entry2)) == 0
+        || strlen((char*)gtk_entry_get_text(fields->entry3)) == 0) {
+      printf("You forgot a chain or something\n");
+      return TRUE;
+    }
+    
+    double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+    
+    load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
+                        (char*)gtk_entry_get_text(fields->entry2),
+                        (char*)gtk_entry_get_text(fields->entry3),
+                        tolerance,
+                        4,
+                        EXLP);
   }
-  
-  double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
-  
-  load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
-                      (char*)gtk_entry_get_text(fields->entry2),
-                      (char*)gtk_entry_get_text(fields->entry3),
-                      tolerance,
-                      EXLP);
   
   return TRUE;
 }
@@ -158,6 +173,7 @@ static void destroy(GtkWidget* widget, gpointer data) {
 
 
 int main(int argc, char* argv[]) {
+
 
   //main areas
   GtkWidget* window;
@@ -196,9 +212,9 @@ int main(int argc, char* argv[]) {
   control_box = gtk_vbox_new(FALSE,0);
   
   //sidebar buttons, etc
-  chain1_text = gtk_entry_buffer_new(NULL, -1);
-  chain2_text = gtk_entry_buffer_new(NULL, -1);
-  chain3_text = gtk_entry_buffer_new(NULL, -1);
+  chain1_text = gtk_entry_buffer_new("abAABB ab", -1);
+  chain2_text = gtk_entry_buffer_new("abAB", -1);
+  chain3_text = gtk_entry_buffer_new("aBAbabAB", -1);
   chain1_entry = gtk_entry_new_with_buffer(chain1_text);
   chain2_entry = gtk_entry_new_with_buffer(chain2_text);
   chain3_entry = gtk_entry_new_with_buffer(chain3_text);
@@ -267,6 +283,9 @@ int main(int argc, char* argv[]) {
   //show everything
   gtk_widget_show_all(window);  
  
+  //init the lp
+  init_lp();
+  
   
   gtk_main();
   
