@@ -24,7 +24,7 @@ double triangle_area(vert_list* V, triangle* T) {
   for (i=0; i<3; i++) {
     base[i] = mpq_get_d(V->verts[ T->verts[1] ].coord[i]) -  
               mpq_get_d(V->verts[ T->verts[0] ].coord[i]);
-    height[i] = mpq_get_d(V->verts[ T->verts[2] ].coord[i]) - (0.5*base[i]);
+    height[i] = mpq_get_d(V->verts[ T->verts[2] ].coord[i]) - (0.5*base[i] + mpq_get_d(V->verts[ T->verts[0] ].coord[i]));
     
     base_len += base[i]*base[i];
     height_len += height[i]*height[i];

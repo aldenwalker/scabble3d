@@ -1050,6 +1050,7 @@ void* run_execution(void* E_void) {
     sem_post(&(E->read_data_sem));
     
     //check for a new tolerance
+    printf("checking for new tolerance\n");
     sem_wait(&(E->message_sem));
     if (E->new_tolerance_check == 1) {
       E->ball->tolerance = E->new_tolerance;
@@ -1058,6 +1059,7 @@ void* run_execution(void* E_void) {
     sem_post(&(E->message_sem));
     
     //check to see if we should skip the current orthant
+    printf("checking for skip_orthant\n");
     sem_wait(&(E->message_sem));
     if (E->skip_orthant == 1) {
       E->ball->current_working_orthant = (E->ball->current_working_orthant + 1)%4;
@@ -1066,6 +1068,7 @@ void* run_execution(void* E_void) {
     sem_post(&(E->message_sem));
     
     //check to see if we should stop
+    printf("Checking if we should stop\n");
     sem_wait(&(E->message_sem));
     if (E->status_message == 1) {
       E->status = 0;
@@ -1075,6 +1078,7 @@ void* run_execution(void* E_void) {
     }
     
     //check to see if actually, we're just done (up to tolerance)
+    printf("checking if we're done\n");
     if (E->ball->is_complete == 1) {
       sem_wait(&(E->message_sem));
       E->status = 0;
