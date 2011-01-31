@@ -101,16 +101,26 @@ void load_inputs_and_run(char* arg1,
     printf("\n");
   }
   
-  execution E;
+  execution* E = (execution*)malloc(sizeof(execution));
   
   //build the computation -- make initial scl computations, etc
-  computation_init(&E, chains, chain_lens, weights, num_words, tolerance, maxjun, solver);
+  computation_init(E, chains, chain_lens, weights, num_words, tolerance, maxjun, solver);
+  
+  execution_print(E);
   
   printf("Done computation init -- about to start pthread\n");
-  
-  
+    
+  printf("Testing semaphore at %lx\n", (long int)&(E->message_sem));
+  sem_wait(&(E->message_sem));
+  sem_post(&(E->message_sem));
+  printf("done test\n");  
+    
   //start the multi-threadedness
-  //PTHREADs
+  pthread_t worker_thread;
+  pthread_create(&worker_thread, NULL, run_execution, (void*)E);
+  
+  printf("started computation thread\n");
+  
 }
   
   

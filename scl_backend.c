@@ -877,11 +877,30 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
   mpq_t min_scl;
   rvector temp_vert;
   
+  printf("*Doing one orthant step\n");
+  
+  printf("Current triangle list:\n");
+  for (i=0; i<orth->triangles->num_tris; i++) {
+    printf("[%d,%d,%d] = ", orth->triangles->tris[i].verts[0],
+                            orth->triangles->tris[i].verts[1],
+                            orth->triangles->tris[i].verts[2]);
+    rvector_print(&orth->vertices->verts[orth->triangles->tris[i].verts[0]]);
+    printf(", ");
+    rvector_print(&orth->vertices->verts[orth->triangles->tris[i].verts[1]]);
+    printf(", ");
+    rvector_print(&orth->vertices->verts[orth->triangles->tris[i].verts[2]]);
+    printf("\n");
+  }
+    
+  
+  
   //find the next undone triangle
   i = find_undone_triangle(orth->triangles, tolerance);
   if (i == -1) {
     return 1;
   }
+  
+  printf("I found that triangle %d was undone\n", i);
   
   //so this triangle can be worked
   rvector_init(&temp_vert, 3);
@@ -893,8 +912,13 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
                                      min_scl,
                                      &temp_vert,
                                      solver);
+  printf("min_scl: ");
+  mpq_out_str(NULL, 10, min_scl);
+  printf("\n");
+  printf("its_linear: %d\n", its_linear);
   
   if (its_linear == 1) {
+    printf("It's linear -- moving the triangle up\n");
     //move the triangle into the correct position near the top
     orth->triangles->tris[i].is_scl_linear = 1;
     temp_tri = orth->triangles->tris[orth->triangles->first_nonlinear_triangle];
@@ -912,6 +936,10 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
     mpq_div(temp_vert.coord[j], temp_vert.coord[j], min_scl);
   }
   
+  printf("It's not linear; adding vertex ");
+  rvector_print(&temp_vert);
+  printf("\n");
+  
   //add it to the vertex list
   vert_list_add_copy(orth->vertices, &temp_vert);
   
@@ -920,6 +948,11 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
                   orth->triangles,
                   i,
                   orth->vertices->num_verts - 1);
+  
+  i = find_undone_triangle(orth->triangles, tolerance);
+  if (i==-1) {
+    orth->max_undone_triangle_area = orth->triangles->tris[i].area;
+  }
   
   //we are now done with this step
   rvector_free(&temp_vert);
@@ -941,7 +974,13 @@ void one_computation_step(ball_problem* ball, enum scallop_lp_solver solver) {
   int cur_orth = ball->current_working_orthant;
   int i;
   
-  if (1 == one_orthant_step(ball->orthants[cur_orth], ball->tolerance, solver)) {  //if 1, we are done
+  printf("Making one orthant step; cur_oth = %d\n", cur_orth);
+  printf("(which is orthant at %lx\n", (long int)ball->orthants[cur_orth]);
+  printf("with tolerance %f\n", ball->tolerance);
+  
+  if (1 == one_orthant_step(ball->orthants[cur_orth], 
+                            ball->tolerance, 
+                            solver)) {  //if 1, we are done
     //try to find something to do
     for (i=1; i<4; i++) {
       if (0 <= find_undone_triangle(ball->orthants[(cur_orth+i)%4]->triangles, 
@@ -967,12 +1006,19 @@ void one_computation_step(ball_problem* ball, enum scallop_lp_solver solver) {
 /* it also checks for input from the GUI thread                              */
 /* we expect that current_working_orthant is set, so that we know what to do */
 /*****************************************************************************/
-void run_execution(execution* E) {
+void* run_execution(void* E_void) {
   
+  execution* E = (execution*)E_void;
+  
+  printf("*started main execution\n");
+  execution_print(E);
+  
+  printf("*About to wait for semaphore at %lx\n", (long int)&(E->message_sem));
   //set the status to running
   sem_wait(&(E->message_sem));
   E->status = 1;
   sem_post(&(E->message_sem));
+  printf("*Done\n");
   
   sem_wait(&(E->running_sem));
   
@@ -981,9 +1027,12 @@ void run_execution(execution* E) {
     //compute the next triangle
     one_computation_step(E->ball, E->solver);
     
+    printf("*done computation step\n");
+    
     //tell the GUI about the new triangles
     sem_wait(&(E->read_data_sem));
     g_idle_add( (GSourceFunc)update_ball_picture_while_running, E );
+    printf("*g_idle_added display function\n");
     sem_wait(&(E->read_data_sem));  //wait until the gui is done
     sem_post(&(E->read_data_sem));
     
@@ -1009,7 +1058,7 @@ void run_execution(execution* E) {
       E->status = 0;
       sem_post(&(E->running_sem));
       sem_post(&(E->message_sem));
-      return;
+      return NULL;
     }
     
     //check to see if actually, we're just done (up to tolerance)
@@ -1019,7 +1068,7 @@ void run_execution(execution* E) {
       sem_post(&(E->message_sem));
       sem_post(&(E->running_sem));
       //g_idle_add(/* we're done function */);
-      return;
+      return NULL;
     }
   }
   
@@ -1180,6 +1229,7 @@ void orthant_problem_init(orthant_problem* orth,
   orth->vertices = (vert_list*)malloc(sizeof(vert_list));
   orth->vertices->verts = NULL;
   orth->vertices->num_verts = 0;
+  orth->max_undone_triangle_area = -1;
   
   mpq_t scl;
   mpq_init(scl);
@@ -1244,7 +1294,7 @@ void computation_init(execution* E,
                       double tolerance,
                       int maxjun,
                       enum scallop_lp_solver solver) {
-  int i;
+  int i,j;
   
   mpq_t predone_scls[3];
   
@@ -1265,12 +1315,22 @@ void computation_init(execution* E,
     mpq_init(predone_scls[i]);
     mpq_set_si(predone_scls[i], 0, 1);
   }
+  E->ball->chains = (char***)malloc(3*sizeof(char**));
+  for (i=0; i<E->ball->num_chains; i++) {
+    E->ball->chains[i] = (char**)malloc((E->ball->chain_lens[i])*sizeof(char*));
+    for (j=0; j<E->ball->chain_lens[i]; j++) {
+      E->ball->chains[i][j] = (char*)malloc((strlen(chains[i][j])+1)*sizeof(char));
+      strcpy(E->ball->chains[i][j], chains[i][j]);
+    }
+  }
   E->ball->is_complete = 0;
   E->ball->orthants = (orthant_problem**)malloc(4*sizeof(orthant_problem*));
   for (i=0; i<4; i++) {
     E->ball->orthants[i] = (orthant_problem*)malloc(sizeof(orthant_problem));
     orthant_problem_init(E->ball->orthants[i], i, chains, chain_lens, weights, num_words, predone_scls, maxjun, solver);
   }
+  E->ball->current_working_orthant = 0;
+  
   sem_init(&(E->message_sem), 0, 1);
   sem_init(&(E->running_sem), 0, 1);
   sem_init(&(E->read_data_sem), 0, 1);
@@ -1284,8 +1344,55 @@ void computation_init(execution* E,
   
   
   
+void scl_problem_print(scl_problem* sp) {
+
+}
+
+
+void orthant_problem_print(orthant_problem* orth) {
+  printf("orthant problem number %d\n", orth->orthant_num);
+  printf("scl_problem at %lx\n", (long int)orth->scl_prob);
+  printf("tri_list at %lx\n", (long int)orth->triangles);
+  printf("vert_list at %lx\n", (long int)orth->vertices);
+  printf("max triangle area: %f\n", orth->max_undone_triangle_area);
+  printf("is_complete: %d\n", orth->is_complete);
+}
+
+
+void ball_problem_print(ball_problem* ball) {
+  int i,j;
+  printf("Ball problem at: %lx:\n", (long int)ball);
+  printf("Chains:\n");
+  for (i=0; i<ball->num_chains; i++) {
+    for (j=0; j<ball->chain_lens[i]; j++) {
+      printf("%s ", ball->chains[i][j]);
+    }
+    printf("\n");
+  }
+  printf("orthants at:\n");
+  for (i=0; i<4; i++) {
+    printf("%lx:\n", (long int)ball->orthants[i]);
+    orthant_problem_print(ball->orthants[i]);
+  }
+  printf("\n");
+  printf("is_complete: %d\n", ball->is_complete);
+  printf("current_working_orthant: %d\n", ball->current_working_orthant);
+  printf("tolerance: %f\n", ball->tolerance);
+}
   
+
+void execution_print(execution* E) {
+  printf("Execution at %lx:\n", (long int)E);
+  printf("status: %d\n", E->status);
+  printf("status_message: %d\n", E->status_message);
+  printf("new_tolerance_check: %d\n", E->new_tolerance_check);
+  printf("skip_orthant: %d\n", E->skip_orthant);
+  printf("solver: %d\n", E->solver);
+  printf("ball at %lx\n", (long int)E->ball);
   
+  ball_problem_print(E->ball);
+
+}
   
   
   

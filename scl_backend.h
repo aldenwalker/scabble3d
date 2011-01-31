@@ -165,7 +165,7 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
 
 void one_computation_step(ball_problem* ball, enum scallop_lp_solver solver);
 
-void run_execution(execution* E);
+void* run_execution(void* E_void);
 
 void orthant_problem_init(orthant_problem* orth, 
                           int index, 
@@ -185,6 +185,14 @@ void computation_init(execution* E,
                       double tolerance,
                       int maxjun,
                       enum scallop_lp_solver solver);
+
+
+void scl_problem_print(scl_problem* sp);
+void orthant_problem_print(orthant_problem* orth);
+void ball_problem_print(ball_problem* ball);
+void execution_print(execution* E);
+
+
 
 
 #endif

@@ -143,7 +143,7 @@ void vert_list_add_copy(vert_list* V, rvector* v) {
   for (i=0; i<v->dim; i++) {
     mpq_set(V->verts[V->num_verts-1].coord[i], v->coord[i]);
   }
-  //printf("Created vertex:\n");
+  printf("Created vertex:\n");
   //rvector_print(&(V->verts[V->num_verts-1]));
   //printf("\n -- current list at %x\n", (int)V);
   //for (i=0; i<V->num_verts; i++) {

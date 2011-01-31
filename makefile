@@ -2,7 +2,7 @@ CCC=g++
 CC=gcc
 CFLAGS= -g -Wall
 IFLAGS=-I/sw/include
-LDFLAGS=-L/sw/lib -lglpk -lgmp
+LDFLAGS=-L/sw/lib -lglpk -lgmp -lpthread
 all: scabble3d
 
 scabc: scabble3d.c matrix.c word.c scl_backend.c triangle_and_vertex.c
