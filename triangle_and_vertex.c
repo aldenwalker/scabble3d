@@ -44,6 +44,7 @@ void tri_list_add_copy(tri_list* T, triangle* t) {
   }
   T->tris[T->num_tris].area = t->area;
   T->tris[T->num_tris].is_scl_linear = t->is_scl_linear;
+  T->num_tris++;
 }
 
 
@@ -153,8 +154,21 @@ void vert_list_add_copy(vert_list* V, rvector* v) {
 }
 
   
-
-  
+void tri_list_print(tri_list* T, vert_list* V) {
+  int i;
+  for (i=0; i<T->num_tris; i++) {
+    printf("(area %f) [%d,%d,%d] = ", T->tris[i].area, 
+                            T->tris[i].verts[0],
+                            T->tris[i].verts[1],
+                            T->tris[i].verts[2]);
+    rvector_print(&V->verts[T->tris[i].verts[0]]);
+    printf(", ");
+    rvector_print(&V->verts[T->tris[i].verts[1]]);
+    printf(", ");
+    rvector_print(&V->verts[T->tris[i].verts[2]]);
+    printf("\n");
+  }
+} 
   
                           
 

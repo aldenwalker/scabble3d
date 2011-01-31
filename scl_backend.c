@@ -560,6 +560,13 @@ int min_scl_over_triangle(scl_problem* scl_prob,
   //we need to add the constraints for both the hyperplane and for the 
   //triangle (3 for the triangle)
   
+  printf("minimizing scl over the triangle with vertices:\n");
+  for (i=0; i<3; i++) {
+    rvector_print(&V->verts[t->verts[i]]);
+    printf(" ");
+  }
+  printf("\n");
+  
   /************* hyperplane **************************************************/
   RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR+1);
   
@@ -576,6 +583,13 @@ int min_scl_over_triangle(scl_problem* scl_prob,
   rvector_sub(&spanning_vector2, &(V->verts[t->verts[2]]), &(V->verts[t->verts[0]]));
   rvector_cross(&normal_vector, &spanning_vector1, &spanning_vector2);
   rvector_dot(normal_value, &normal_vector, &(V->verts[t->verts[0]]));
+  
+  printf("spanning vectors:\n");
+  rvector_print(&spanning_vector1);
+  rvector_print(&spanning_vector2);
+  printf("normal_vector:\n");
+  rvector_print(&normal_vector);
+  
   
   //now go through the polygons and say that the image in the 3d space, dotted
   //with normal_vector, gives normal_value
@@ -675,6 +689,7 @@ int min_scl_over_triangle(scl_problem* scl_prob,
                              scl_prob->equality_type,
                              solver);
   
+  printf("Got scl: "); mpq_out_str(NULL, 10, scl); printf("\n");
   
   /***************** read solution vector ************************************/
   for (i=0; i<3; i++) {
@@ -689,8 +704,8 @@ int min_scl_over_triangle(scl_problem* scl_prob,
     for (j=0; j<scl_prob->poly_list[i].num_arcs; j++) {
       first_word_index = 0;
       for (k=0; k<3; k++) {
-        if (scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first_word == first_word_index
-            && scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first == 0) {
+        if (scl_prob->arc_list[scl_prob->poly_list[i].arc[j]].first_word == first_word_index
+            && scl_prob->arc_list[scl_prob->poly_list[i].arc[j]].first == 0) {
           mpq_set_si(temp_mpq, scl_prob->weights[first_word_index],1);
           mpq_div(temp_mpq, solution_vector.coord[i], temp_mpq);
           mpq_add(new_vertex->coord[k], new_vertex->coord[k], temp_mpq);
@@ -880,17 +895,7 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
   printf("*Doing one orthant step\n");
   
   printf("Current triangle list:\n");
-  for (i=0; i<orth->triangles->num_tris; i++) {
-    printf("[%d,%d,%d] = ", orth->triangles->tris[i].verts[0],
-                            orth->triangles->tris[i].verts[1],
-                            orth->triangles->tris[i].verts[2]);
-    rvector_print(&orth->vertices->verts[orth->triangles->tris[i].verts[0]]);
-    printf(", ");
-    rvector_print(&orth->vertices->verts[orth->triangles->tris[i].verts[1]]);
-    printf(", ");
-    rvector_print(&orth->vertices->verts[orth->triangles->tris[i].verts[2]]);
-    printf("\n");
-  }
+  tri_list_print(orth->triangles, orth->vertices);
     
   
   
@@ -932,9 +937,10 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
   //any other triangles which share the split edges
   
   //first, scale the new vertex so that it has scl = 1
-  for (j=0; j<3; j++) {
-    mpq_div(temp_vert.coord[j], temp_vert.coord[j], min_scl);
-  }
+  //THIS IS ALREADY DONE
+  //for (j=0; j<3; j++) {
+  //  mpq_div(temp_vert.coord[j], temp_vert.coord[j], min_scl);
+  //}
   
   printf("It's not linear; adding vertex ");
   rvector_print(&temp_vert);
@@ -949,8 +955,15 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
                   i,
                   orth->vertices->num_verts - 1);
   
+  printf("I split the triangle\n");
+  printf("triangles:\n");
+  tri_list_print(orth->triangles, orth->vertices);
+  
   i = find_undone_triangle(orth->triangles, tolerance);
-  if (i==-1) {
+  
+  printf("The next undone triangle is: %d\n", i);
+  
+  if (i!=-1) {
     orth->max_undone_triangle_area = orth->triangles->tris[i].area;
   }
   

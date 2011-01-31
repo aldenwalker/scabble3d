@@ -43,6 +43,7 @@ typedef struct {
  
  double triangle_area(vert_list* V, triangle* T);
  void tri_list_add_copy(tri_list* T, triangle* t);
+ void tri_list_print(tri_list* T, vert_list* V);
  void tri_list_delete_index(tri_list* T, int index);
  void tri_list_delete_indices(tri_list* T, int ind1, int ind2);
  void rvector_init(rvector* v, int len) ;
