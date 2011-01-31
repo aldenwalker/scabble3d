@@ -157,6 +157,9 @@ void vert_list_add_copy(vert_list* V, rvector* v) {
 void tri_list_print(tri_list* T, vert_list* V) {
   int i;
   for (i=0; i<T->num_tris; i++) {
+    if (T->tris[i].is_scl_linear == 1) {
+      printf("*");
+    }
     printf("(area %f) [%d,%d,%d] = ", T->tris[i].area, 
                             T->tris[i].verts[0],
                             T->tris[i].verts[1],

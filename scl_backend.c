@@ -550,7 +550,7 @@ int min_scl_over_triangle(scl_problem* scl_prob,
                           mpq_t scl,
                           rvector* new_vertex,
                           enum scallop_lp_solver solver) {
-  int i,j,k,l;
+  int i,j,k,l,m;
   int first_word_index;
   mpq_t temp_mpq;
   mpq_init(temp_mpq);
@@ -589,7 +589,8 @@ int min_scl_over_triangle(scl_problem* scl_prob,
   rvector_print(&spanning_vector2);
   printf("normal_vector:\n");
   rvector_print(&normal_vector);
-  
+  printf("With hyperplane value: ");
+  mpq_out_str(NULL, 10, normal_value); printf("\n");
   
   //now go through the polygons and say that the image in the 3d space, dotted
   //with normal_vector, gives normal_value
@@ -630,7 +631,7 @@ int min_scl_over_triangle(scl_problem* scl_prob,
   
   for (i=0; i<3; i++) {
     
-    RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR+2);
+    RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR+2);     
     
     rvector_sub(&spanning_vector1, 
                 &(V->verts[t->verts[(i+1)%3]]), 
@@ -643,6 +644,14 @@ int min_scl_over_triangle(scl_problem* scl_prob,
       mpq_swap(parallel_value1, parallel_value2);
     }
     
+    printf("parallel vector %d:\n", i);
+    rvector_print(&parallel_vector);
+    printf("\nwith limits ");
+    mpq_out_str(NULL, 10, parallel_value1);
+    printf(" and ");
+    mpq_out_str(NULL, 10, parallel_value2);
+    printf("\n");
+    
     for (j=0; j<scl_prob->num_polys; j++) {
       mpq_set_si(coef, 0, 1);
       for (k=0; k<scl_prob->poly_list[j].num_arcs; k++) {
@@ -650,6 +659,13 @@ int min_scl_over_triangle(scl_problem* scl_prob,
         for (l=0; l<scl_prob->num_chains; l++) {
           if (scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first_word == first_word_index
               && scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first == 0) {
+            //printf("For polygon %d:\n", j);
+            //for (m=0; m<scl_prob->poly_list[j].num_arcs; m++) {
+            //  printf("%d ", scl_prob->poly_list[j].arc[m]);
+            //}
+            //printf("\nI found that spot %d, which has arc with word %d and index %d, contributes\n", 
+            //          k, scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first_word, 
+            //          scl_prob->arc_list[scl_prob->poly_list[j].arc[k]].first);
             mpq_set_si(temp_mpq, scl_prob->weights[first_word_index],1);
             mpq_div(temp_mpq, parallel_vector.coord[l], temp_mpq);
             mpq_add(coef, coef, temp_mpq);
@@ -672,10 +688,13 @@ int min_scl_over_triangle(scl_problem* scl_prob,
                parallel_value2);
     mpq_neg(parallel_value1, parallel_value1);
     RatMat_set(scl_prob->constraints, 
-               scl_prob->constraints->nR-2, 
+               scl_prob->constraints->nR-1, 
                scl_prob->constraints->nC-1,
                parallel_value1);
   }
+  
+  //printf("constraint matrix:\n");
+  //RatMat_print(scl_prob->constraints, 1);
   
   
   /**************** linear programming ***************************************/
@@ -815,6 +834,8 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
   //find out where the new vertex is in the triangle
   vert_in_edge = find_edge_for_vertex(V, &(T->tris[split_ind]), new_vert);
   
+  printf("I'm splitting the triangle -- looks like the new vert is in edge %d\n", vert_in_edge);
+  
   if (vert_in_edge == 3) {  //it's in the interior
     //if the triangle is 0 1 2, and the new vertex is x, then
     //the new triangles are 0 1 x, 1 2 x, 2 0 x
@@ -831,6 +852,7 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
   } else {  //it's in an edge
     //if the edge to split is i and the new vertex is x, then the new triangles
     //are i+1, i+2, x  and  i+2, i, x
+    
     temp_tri.verts[0] = T->tris[split_ind].verts[(vert_in_edge+1)%3];
     temp_tri.verts[1] = T->tris[split_ind].verts[(vert_in_edge+2)%3];
     temp_tri.verts[2] = new_vert;
@@ -842,6 +864,8 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
     temp_tri.area = triangle_area(V, &temp_tri);
     tri_list_add_copy(T, &temp_tri);
     
+    printf("Added two triangles == current length is %d\n", T->num_tris);
+    
     //now there's another triangle somewhere which has to be split as well
     edge_vert1 = T->tris[split_ind].verts[vert_in_edge];
     edge_vert2 = T->tris[split_ind].verts[(vert_in_edge+1)%3];
@@ -849,13 +873,14 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
       for (k=0; k<3; k++) {
         if (   T->tris[j].verts[k] == edge_vert2 
             && T->tris[j].verts[(k+1)%3] == edge_vert1) {
-          temp_tri.verts[0] = T->tris[j].verts[edge_vert1];
-          temp_tri.verts[1] = T->tris[j].verts[(edge_vert1+1)%3];
+          printf("looks like I found the other triangle -- edge %d in triangle %d\n", k, j);
+          temp_tri.verts[0] = T->tris[j].verts[(k+1)%3];
+          temp_tri.verts[1] = T->tris[j].verts[(k+2)%3];
           temp_tri.verts[2] = new_vert;
           temp_tri.area = triangle_area(V, &temp_tri);
           tri_list_add_copy(T, &temp_tri);
-          temp_tri.verts[0] = T->tris[split_ind].verts[(edge_vert1+1)%3];
-          temp_tri.verts[1] = T->tris[split_ind].verts[edge_vert2];
+          temp_tri.verts[0] = T->tris[j].verts[(k+2)%3];
+          temp_tri.verts[1] = T->tris[j].verts[k];
           temp_tri.verts[2] = new_vert;
           temp_tri.area = triangle_area(V, &temp_tri);
           tri_list_add_copy(T, &temp_tri);
@@ -870,7 +895,12 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
     }
     
     //delete both our triangle and the other one
-    tri_list_delete_indices(T, split_ind, j);
+    //(only delete the other one if we found it)
+    if (j<T->num_tris) {
+      tri_list_delete_indices(T, split_ind, j);
+    } else {
+      tri_list_delete_index(T, split_ind); 
+    }
     
     //free
     free(temp_tri.verts);
@@ -1020,6 +1050,7 @@ void one_computation_step(ball_problem* ball, enum scallop_lp_solver solver) {
 /* we expect that current_working_orthant is set, so that we know what to do */
 /*****************************************************************************/
 void* run_execution(void* E_void) {
+  int value;
   
   execution* E = (execution*)E_void;
   
@@ -1049,6 +1080,9 @@ void* run_execution(void* E_void) {
     sem_wait(&(E->read_data_sem));  //wait until the gui is done
     sem_post(&(E->read_data_sem));
     
+    sem_getvalue(&(E->message_sem), &value);
+    printf("E->message_sem: %d\n", value);
+    
     //check for a new tolerance
     printf("checking for new tolerance\n");
     sem_wait(&(E->message_sem));
@@ -1076,6 +1110,7 @@ void* run_execution(void* E_void) {
       sem_post(&(E->message_sem));
       return NULL;
     }
+    sem_post(&(E->message_sem));
     
     //check to see if actually, we're just done (up to tolerance)
     printf("checking if we're done\n");
@@ -1150,14 +1185,26 @@ void scl_problem_init(scl_problem* scl_prob,
   generate_arcs(&(scl_prob->arc_list), &(scl_prob->num_arcs), 
                 scl_prob->word_list, scl_prob->num_words);
   
-  printf("Generated arcs\n");
+  printf("Generated %d arcs:\n", scl_prob->num_arcs);
+  //for (i=0; i<scl_prob->num_arcs; i++) {
+  //  printf("%d %d %d %d\n", scl_prob->arc_list[i].first_word,
+  //                          scl_prob->arc_list[i].first,
+  //                          scl_prob->arc_list[i].last_word,
+  //                          scl_prob->arc_list[i].last);
+  //}
   
   generate_polygons(scl_prob->word_list, scl_prob->num_words,
                     scl_prob->arc_list, scl_prob->num_arcs,
                     &(scl_prob->poly_list), &(scl_prob->num_polys),
                     maxjun);
                     
-  printf("Generated polygons\n");
+  printf("Generated %d polygons:\n", scl_prob->num_polys);
+  //for (i=0; i<scl_prob->num_polys; i++) {
+  //  for (j=0; j<scl_prob->poly_list[i].num_arcs; j++) {
+  //    printf("%d ", scl_prob->poly_list[i].arc[j]);
+  //  }
+  //  printf("\n");
+  //}
   
   //printf("scl_prob->equality_type: %x\n", scl_prob->equality_type);
     
