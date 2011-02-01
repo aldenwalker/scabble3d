@@ -98,6 +98,8 @@ typedef struct {
   
   sem_t read_data_sem;     //this tells the gui thread to read the data
                            //note that the worker thread is waiting for this
+  char* initial_arguments[3];                         
+   
   GtkWidget* target_drawing_area; //this is the widget to draw to
   
 } execution;

@@ -156,6 +156,26 @@ void vert_list_add_copy(vert_list* V, rvector* v) {
    
 }
 
+void vert_list_d_add_copy(vert_list_d* V, double* v) {
+  int i;
+  V->num_verts ++;
+  V->verts = (double**)realloc((void*)(V->verts), (V->num_verts)*sizeof(double*));
+  V->verts[V->num_verts-1] = (double*)malloc(3*sizeof(double));
+  for (i=0; i<3; i++) {
+    V->verts[V->num_verts-1][i] = v[i];
+  }
+}
+ 
+void vert_list_d_delete_index(vert_list_d* V, int ind) {
+  int i;
+  free(V->verts[ind]);
+  for (i = ind; i<V->num_verts-1; i++) {
+    V->verts[i] = V->verts[i+1];
+  }
+  V->num_verts--;
+  V->verts = (double**)realloc((void*)(V->verts),
+                               (V->num_verts)*sizeof(double*));
+}
   
 void tri_list_print(tri_list* T, vert_list* V) {
   int i;
@@ -176,7 +196,28 @@ void tri_list_print(tri_list* T, vert_list* V) {
   }
 } 
   
-                          
+void tri_list_print_d(tri_list* T, vert_list_d* V) {
+  int i;
+  for (i=0; i<T->num_tris; i++) {
+    if (T->tris[i].is_scl_linear == 1) {
+      printf("*");
+    }
+    printf("(area %f) [%d,%d,%d] = ", T->tris[i].area, 
+                            T->tris[i].verts[0],
+                            T->tris[i].verts[1],
+                            T->tris[i].verts[2]);
+    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[0]][0], 
+                          V->verts[T->tris[i].verts[0]][1], 
+                          V->verts[T->tris[i].verts[0]][2]);
+    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[1]][0], 
+                          V->verts[T->tris[i].verts[1]][1], 
+                          V->verts[T->tris[i].verts[1]][2]);
+    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[2]][0], 
+                          V->verts[T->tris[i].verts[2]][1], 
+                          V->verts[T->tris[i].verts[2]][2]);
+
+  }
+}                         
 
 
 

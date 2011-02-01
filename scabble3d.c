@@ -9,7 +9,7 @@
 #include <GL/gl.h>
 #include <gmp.h>
 
-
+#include "scabble3d.h"
 #include "triangle_and_vertex.h"
 #include "matrix.h"
 #include "scl_backend.h"
@@ -31,9 +31,69 @@ typedef struct {
 GdkPixmap* pixmap = NULL;
 GdkGLPixmap* GLPixmap = NULL;
 GdkGLContext* GLContext = NULL;
+ball_mesh* GLmesh = NULL;
 
 //this is the global execution going on 
 execution* EGlobal = NULL;
+
+
+/*****************************************************************************/
+/* this function draws the opengl scene                                      */
+/*****************************************************************************/
+void draw_mesh() {
+  int i,j,orth;
+  GdkGLDrawable* gldrawable = gdk_pixmap_get_gl_drawable(pixmap);
+  
+  if (!gdk_gl_drawable_gl_begin(gldrawable, GLContext)) {
+    printf("Couldn't start opengl drawing\n");
+  }
+  
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  
+  glMatrixMode(GL_MODELVIEW);
+  glPushMatrix();
+  
+  GLfloat blueish[] = {0.6, 0.6, 0.9, 1};
+  GLfloat redish[] = {0.9, 0.6, 0.6, 1};
+  GLfloat spec[] = {0.2, 0.2, 0.2, 1};
+  
+  glRotatef(15 , 1, 0, -1);
+  glRotatef(-45, 0, 1, 0);
+  
+  glMaterialfv(GL_FRONT, GL_DIFFUSE, blueish);
+  glMaterialfv(GL_FRONT, GL_SPECULAR, spec);
+  
+  //go through the triangles and print them
+  //I want to make this more efficient
+  glBegin(GL_TRIANGLES);
+  for (orth=0; orth<4; orth++) {
+    for (i=0; i<GLmesh->triangles[orth]->num_tris; i++) {
+      glNormal3f(GLmesh->normals[orth]->verts[i][0], 
+                 GLmesh->normals[orth]->verts[i][1], 
+                 GLmesh->normals[orth]->verts[i][2]);
+      for (j=0; j<3; j++) {
+        glVertex3f( GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
+                    GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
+                    GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
+      }    
+    }
+  }
+  glEnd();
+  glPopMatrix();
+  
+  if(gdk_gl_drawable_is_double_buffered(gldrawable)) {
+    gdk_gl_drawable_swap_buffers(gldrawable);
+  } else {
+	  glFlush();
+	}
+
+	gdk_gl_drawable_gl_end(gldrawable);
+  
+  gdk_window_invalidate_rect(EGlobal->target_drawing_area->window, 
+                             &EGlobal->target_drawing_area->allocation, 
+                             FALSE);
+	gdk_window_process_updates(EGlobal->target_drawing_area->window, FALSE);
+}
 
 /*****************************************************************************/
 /* this is a handy cross product   (only for 3d)                             */
@@ -49,79 +109,87 @@ void dvector_cross(double* dest, double* a, double* b) {
 /*****************************************************************************/
 void update_ball_picture_while_running(execution* E) {
   int i,j,k,l;
+  double new_vert[3];
   double point[3][3];
   double diff1[3];
   double diff2[3];
   double normal[3];
+  int offset = 0;
   
   printf("Hey I'm drawing the ball now\n");
   
-  GdkGLDrawable* gldrawable = gdk_pixmap_get_gl_drawable(pixmap);
-  
-  if (!gdk_gl_drawable_gl_begin(gldrawable, GLContext)) {
-    printf("Couldn't start opengl drawing\n");
-  }
-  
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  
-  glMatrixMode(GL_MODELVIEW);
-  glPushMatrix();
-  
-  glRotatef(20, 1, 0, 0);
-  
-  //go through the triangles and print them
-  //I want to make this more efficient
+   
   tri_list* T = NULL;
   vert_list* V = NULL;
   for (i=0; i<4; i++) {
     T = E->ball->orthants[i]->triangles;
     V = E->ball->orthants[i]->vertices;
-    glBegin(GL_TRIANGLES);
-    printf("I'm drawing %d triangles for orthant %d\n", T->num_tris, i);
-    for (j=0; j<T->num_tris; j++) {
+    
+    //add the new vertices
+    for (j=GLmesh->vertices[i]->num_verts; j<V->num_verts; j++) {
       for (k=0; k<3; k++) {
-        for (l=0; l<3; l++) {
-          point[k][l] = mpq_get_d(V->verts[T->tris[j].verts[k]].coord[l]); 
-        }
-        point[k][0] = ((i&1)==1 ? -point[k][0] : point[k][0]);
-        point[k][1] = (((i>>1)&1)==1 ? -point[k][1] : point[k][1]);
+        new_vert[k] = mpq_get_d(V->verts[j].coord[k]);
       }
-      //now make the normal and put into gl
-      for (k=0; k<3; k++) {
-        diff1[k] = point[1][k] - point[0][k];
-        diff2[k] = point[2][k] - point[0][k];
-      }
-      dvector_cross(normal, diff1, diff2);
-      //if we only swapped one coordinate, we need to 
-      //reverse orientation on the normals
-      if (i==1 || i==3) {
-        normal[0] = -normal[0]; normal[1] = -normal[1]; normal[2] = -normal[2];
-      }
-      glNormal3f( normal[0], normal[1], normal[2]);
-      for (k=0; k<3; k++) {
-        glVertex3f( point[k][0], point[k][1], point[k][2]);
-      }      
+      new_vert[0] = ((i&1)==1 ? -new_vert[0] : new_vert[0]);
+      new_vert[1] = (((i>>1)&1)==1 ? -new_vert[1] : new_vert[1]);
+      vert_list_d_add_copy(GLmesh->vertices[i], new_vert);
     }
-    glEnd();
+    
+    //delete triangles in the mesh which have disappeared
+    j = 0;
+    while (j<GLmesh->triangles[i]->num_tris) {
+      for (k=0; k<T->num_tris; k++) {
+        if (T->tris[k].verts[0] == GLmesh->triangles[i]->tris[j].verts[0]
+           && T->tris[k].verts[1] == GLmesh->triangles[i]->tris[j].verts[1]
+           && T->tris[k].verts[2] == GLmesh->triangles[i]->tris[j].verts[2]){
+          break;
+        }
+      }
+      if (k<T->num_tris) {
+        j++;
+      } else {
+        tri_list_delete_index(GLmesh->triangles[i], j);
+        vert_list_d_delete_index(GLmesh->normals[i], j);
+      }
+    }
+    
+    //add triangles in orthant which are new
+    for (j=0; j<T->num_tris; j++) {
+      for (k=0; k<GLmesh->triangles[i]->num_tris; k++) { 
+        if (T->tris[j].verts[0] == GLmesh->triangles[i]->tris[k].verts[0]
+           && T->tris[j].verts[1] == GLmesh->triangles[i]->tris[k].verts[1]
+           && T->tris[j].verts[2] == GLmesh->triangles[i]->tris[k].verts[2]){
+          break;
+        }
+      }
+      if (k <  GLmesh->triangles[i]->num_tris) {
+        continue;
+      } else {
+        tri_list_add_copy(GLmesh->triangles[i], &T->tris[j]);
+        //add the normal
+        for (k=0; k<3; k++) {
+          for (l=0; l<3; l++) {
+            point[k][l] = mpq_get_d(V->verts[T->tris[j].verts[k]].coord[l]); 
+          }
+          point[k][0] = ((i&1)==1 ? -point[k][0] : point[k][0]);
+          point[k][1] = (((i>>1)&1)==1 ? -point[k][1] : point[k][1]);
+        }
+        for (k=0; k<3; k++) {
+          diff1[k] = point[1][k] - point[0][k];
+          diff2[k] = point[2][k] - point[0][k];
+        }
+        dvector_cross(normal, diff1, diff2);
+        //if we only swapped one coordinate, we need to 
+        //reverse orientation on the normals
+        if (i==1 || i==3) {
+          normal[0] = -normal[0]; normal[1] = -normal[1]; normal[2] = -normal[2];
+        }
+        vert_list_d_add_copy(GLmesh->normals[i], normal);
+      }
+    }
   }
 
-
-  glPopMatrix();
-  
-  
-  if(gdk_gl_drawable_is_double_buffered(gldrawable)) {
-    gdk_gl_drawable_swap_buffers(gldrawable);
-  } else {
-	  glFlush();
-	}
-
-	gdk_gl_drawable_gl_end(gldrawable);
-  
-  gdk_window_invalidate_rect(E->target_drawing_area->window, 
-                             &E->target_drawing_area->allocation, 
-                             FALSE);
-	gdk_window_process_updates(E->target_drawing_area->window, FALSE);
-  
+  draw_mesh();
   
   sem_post(&(E->read_data_sem));
   
@@ -223,8 +291,27 @@ void load_inputs_and_run(char* arg1,
   
   EGlobal = E;
   
+  for (i=0; i<3; i++) {
+    EGlobal->initial_arguments[i] = (char*)malloc((strlen(args[i])+1)*sizeof(char));
+    strcpy(EGlobal->initial_arguments[i], args[i]);
+  }
+  
   execution_print(E);
   
+  //initialize the GLmesh
+  GLmesh = (ball_mesh*)malloc(sizeof(ball_mesh));
+  for (i=0; i<4; i++) {
+    GLmesh->triangles[i] = (tri_list*)malloc(sizeof(tri_list));
+    GLmesh->vertices[i] = (vert_list_d*)malloc(sizeof(vert_list_d));
+    GLmesh->normals[i] = (vert_list_d*)malloc(sizeof(vert_list_d*));
+    GLmesh->triangles[i]->num_tris = 0;
+    GLmesh->triangles[i]->tris = NULL;
+    GLmesh->vertices[i]->num_verts = 0;
+    GLmesh->vertices[i]->verts = NULL;
+    GLmesh->normals[i]->num_verts = 0;
+    GLmesh->normals[i]->verts = NULL;
+  }
+    
   sem_wait(&(E->read_data_sem));
   update_ball_picture_while_running(E);
   printf("Drew the initial ball\n");
@@ -246,29 +333,48 @@ void load_inputs_and_run(char* arg1,
 static gboolean run_button_press(GtkWidget* widget,
                                  GdkEventButton* event,
                                  fieldList* fields) {
+  char* e1;
+  char* e2;
+  char* e3;
   
   if (event->type == GDK_BUTTON_RELEASE) {
     
-    if (strlen((char*)gtk_entry_get_text(fields->entry1)) == 0
-        || strlen((char*)gtk_entry_get_text(fields->entry2)) == 0
-        || strlen((char*)gtk_entry_get_text(fields->entry3)) == 0) {
-      printf("You forgot a chain or something\n");
-      return TRUE;
-    }
+    e1 = (char*)gtk_entry_get_text(fields->entry1);
+    e2 = (char*)gtk_entry_get_text(fields->entry2);
+    e3 = (char*)gtk_entry_get_text(fields->entry3);
     
-    double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+    if (EGlobal == NULL || 
+         (strcmp(EGlobal->initial_arguments[0], e1)!=0
+          || strcmp(EGlobal->initial_arguments[1], e2)!=0
+          || strcmp(EGlobal->initial_arguments[2], e3)!=0)) {
     
-    load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
-                        (char*)gtk_entry_get_text(fields->entry2),
-                        (char*)gtk_entry_get_text(fields->entry3),
-                        tolerance,
-                        4,
-                        EXLP,
-                        fields->drawing);
-  }
+       if (strlen(e1) == 0
+          || strlen(e2) == 0
+          || strlen(e3) == 0) {
+        printf("You forgot a chain or something\n");
+        return TRUE;
+      }
+      double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+      load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
+                          (char*)gtk_entry_get_text(fields->entry2),
+                          (char*)gtk_entry_get_text(fields->entry3),
+                          tolerance,
+                          4,
+                          EXLP,
+                          fields->drawing);
+                          
   
+    } else { //we already have an execution -- run it
+      //make the tolerance whatever is in the box
+      EGlobal->ball->tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+      pthread_t worker_thread;
+      pthread_create(&worker_thread, NULL, run_execution, (void*)EGlobal);
+    
+      printf("started computation thread\n");  
+    }
+  }
   return TRUE;
-}
+}       
 
 static gboolean pause_button_press(GtkWidget* widget,
                                    GdkEventButton* event,
@@ -502,7 +608,14 @@ int main(int argc, char* argv[]) {
                      "button_release_event",
                      G_CALLBACK(run_button_press),
                      &fields);
-  
+  gtk_signal_connect(GTK_OBJECT(pause_button),
+                     "button_press_event",
+                     G_CALLBACK(pause_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(pause_button),
+                     "button_release_event",
+                     G_CALLBACK(pause_button_press),
+                     &fields);
   
   
   

@@ -160,6 +160,7 @@ void linear_program_from_ratmat(polygon* poly_list,
     //  cout << "Vars: " << lp->vars;
     //}
     
+    printf("Rows: %d\nCols: %d\n", lp->rows, lp->vars);
     
     result = solve_lp(lp);
     
@@ -741,14 +742,13 @@ int min_scl_over_triangle(scl_problem* scl_prob,
     mpq_mul(new_vertex->coord[i], new_vertex->coord[i], temp_mpq);
   }
   
-  //remove those rows and stuff
+  
+FREE_EVERYTHING:
+ //remove those rows and stuff
   RatMat_change_num_rows(scl_prob->constraints, 
                          scl_prob->constraints->nR-(2*3+1));
   scl_prob->equality_type = (int*)realloc((void*)(scl_prob->equality_type),
                                           scl_prob->constraints->nR*sizeof(int));
-  
-  
-FREE_EVERYTHING:
   mpq_clear(temp_mpq);
   mpq_clear(coef);
   mpq_clear(normal_value);
@@ -1061,6 +1061,7 @@ void* run_execution(void* E_void) {
   //set the status to running
   sem_wait(&(E->message_sem));
   E->status = 1;
+  E->status_message = 0;
   sem_post(&(E->message_sem));
   printf("*Done\n");
   
