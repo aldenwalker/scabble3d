@@ -8,6 +8,7 @@
 #define __ball_worker__
 
 #include <gmp.h>
+#include <gtk/gtk.h>
 #include <semaphore.h>
 
 #include "matrix.h"
@@ -97,6 +98,8 @@ typedef struct {
   
   sem_t read_data_sem;     //this tells the gui thread to read the data
                            //note that the worker thread is waiting for this
+  GtkWidget* target_drawing_area; //this is the widget to draw to
+  
 } execution;
 
 
@@ -184,7 +187,8 @@ void computation_init(execution* E,
                       int num_words,
                       double tolerance,
                       int maxjun,
-                      enum scallop_lp_solver solver);
+                      enum scallop_lp_solver solver,
+                      GtkWidget* target_drawing_area);
 
 
 void scl_problem_print(scl_problem* sp);

@@ -18,6 +18,7 @@ typedef struct {
 typedef struct {
   int* verts;    //this is the vertex indices in the vertex list
                  //the number of vertices should be implicit
+  //rvector normal[3];
   double area;
   int is_scl_linear; //1 means yes, 0 means unknown, -1 means no
 } triangle;

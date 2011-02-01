@@ -550,7 +550,7 @@ int min_scl_over_triangle(scl_problem* scl_prob,
                           mpq_t scl,
                           rvector* new_vertex,
                           enum scallop_lp_solver solver) {
-  int i,j,k,l,m;
+  int i,j,k,l;
   int first_word_index;
   mpq_t temp_mpq;
   mpq_init(temp_mpq);
@@ -916,7 +916,7 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
 /* returns 1 if this orthant is complete (up to the current tolerance)      */
 /****************************************************************************/
 int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_solver solver) {
-  int i,j;
+  int i;
   int its_linear;
   triangle temp_tri;
   mpq_t min_scl;
@@ -1357,7 +1357,8 @@ void computation_init(execution* E,
                       int num_words,
                       double tolerance,
                       int maxjun,
-                      enum scallop_lp_solver solver) {
+                      enum scallop_lp_solver solver,
+                      GtkWidget* target_drawing_area) {
   int i,j;
   
   mpq_t predone_scls[3];
@@ -1399,6 +1400,8 @@ void computation_init(execution* E,
   sem_init(&(E->running_sem), 0, 1);
   sem_init(&(E->read_data_sem), 0, 1);
   
+  //drawing area
+  E->target_drawing_area = target_drawing_area;
   
   for (i=0; i<3; i++) {
     mpq_clear(predone_scls[i]);

@@ -35,12 +35,15 @@ double triangle_area(vert_list* V, triangle* T) {
 
 
 
+
+
 void tri_list_add_copy(tri_list* T, triangle* t) {
   int i;
   T->tris = (triangle*)realloc((void*)(T->tris), (T->num_tris+1)*sizeof(triangle));
   T->tris[T->num_tris].verts = (int*)malloc(3*sizeof(int));
   for (i=0; i<3; i++) {
     T->tris[T->num_tris].verts[i] = t->verts[i];
+    //rvector_copy(&T->tris[T->num_tris].normal[i], &t->normal[i]);
   }
   T->tris[T->num_tris].area = t->area;
   T->tris[T->num_tris].is_scl_linear = t->is_scl_linear;
