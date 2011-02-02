@@ -27,6 +27,17 @@ typedef struct {
   GtkWidget* drawing;
 } fieldList;
 
+struct {
+  double button1_down_x;
+  double button1_down_y;
+  double button3_down_x;
+  double button3_down_y;
+  double current_rotation_x;
+  double current_rotation_y;
+  double constant_rotation_x;
+  double constant_rotation_y;
+} dstatus;
+
 //these are the opengl globals that I think I need
 GdkPixmap* pixmap = NULL;
 GdkGLPixmap* GLPixmap = NULL;
@@ -55,30 +66,80 @@ void draw_mesh() {
   
   GLfloat blueish[] = {0.6, 0.6, 0.9, 1};
   GLfloat redish[] = {0.9, 0.6, 0.6, 1};
-  GLfloat spec[] = {0.2, 0.2, 0.2, 1};
+  GLfloat red[] = {1,0,0,1};
+  GLfloat green[] = {0,1,0,1};
+  GLfloat blue[] = {0,0,1,1};
+  GLfloat spec[] = {0.1, 0.1, 0.1, 1};
   
-  glRotatef(15 , 1, 0, -1);
-  glRotatef(-45, 0, 1, 0);
+  glRotatef(dstatus.current_rotation_x + dstatus.constant_rotation_x, 0, 1, 0);
+  glRotatef(dstatus.current_rotation_y + dstatus.constant_rotation_y, -1, 0, 0);
   
-  glMaterialfv(GL_FRONT, GL_DIFFUSE, blueish);
-  glMaterialfv(GL_FRONT, GL_SPECULAR, spec);
+  //draw the axis
+  glMaterialfv(GL_FRONT, GL_DIFFUSE, red);
+  glBegin(GL_LINES);
+    glVertex3f(0,0,0);
+    glVertex3f(4,0,0);
+  glEnd();
+  glMaterialfv(GL_FRONT, GL_DIFFUSE, green);
+  glBegin(GL_LINES);
+    glVertex3f(0,0,0);
+    glVertex3f(0,4,0);
+  glEnd();
+  glMaterialfv(GL_FRONT, GL_DIFFUSE, blue);
+  glBegin(GL_LINES);
+    glVertex3f(0,0,0);
+    glVertex3f(0,0,4);
+  glEnd();
+
   
   //go through the triangles and print them
   //I want to make this more efficient
-  glBegin(GL_TRIANGLES);
+  glMaterialfv(GL_FRONT, GL_SPECULAR, spec);
   for (orth=0; orth<4; orth++) {
+    //printf("For orthant %d, I'm displaying the following triangles:\n", orth);
+    //tri_list_print_d(GLmesh->triangles[orth], GLmesh->vertices[orth]);
     for (i=0; i<GLmesh->triangles[orth]->num_tris; i++) {
+      if (GLmesh->triangles[orth]->tris[i].is_scl_linear == 1) {
+        glMaterialfv(GL_FRONT, GL_DIFFUSE, blueish);
+      } else {
+        glMaterialfv(GL_FRONT, GL_DIFFUSE, redish);
+      }
+      glBegin(GL_TRIANGLES);
+      //FRONT
+      printf("Normal: [%f,%f,%f]\n", GLmesh->normals[orth]->verts[i][0], 
+                                     GLmesh->normals[orth]->verts[i][1], 
+                                     GLmesh->normals[orth]->verts[i][2]);
       glNormal3f(GLmesh->normals[orth]->verts[i][0], 
                  GLmesh->normals[orth]->verts[i][1], 
                  GLmesh->normals[orth]->verts[i][2]);
       for (j=0; j<3; j++) {
+        printf("\t\tVertex: [%f,%f,%f]\n", GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
+                                        GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
+                                        GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
         glVertex3f( GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
                     GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
                     GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
-      }    
+      }
+      //BACK
+      printf("Normal: [%f,%f,%f]\n", -GLmesh->normals[orth]->verts[i][0], 
+                                     -GLmesh->normals[orth]->verts[i][1], 
+                                     -GLmesh->normals[orth]->verts[i][2]);      
+      glNormal3f(-GLmesh->normals[orth]->verts[i][0], 
+                 -GLmesh->normals[orth]->verts[i][1], 
+                 -GLmesh->normals[orth]->verts[i][2]);
+      for (j=0; j<3; j++) {
+        printf("\t\tVertex: [%f,%f,%f]\n", -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
+                                        -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
+                                        -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
+        glVertex3f( -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
+                    -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
+                    -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
+      }
+      glEnd();
+          
     }
   }
-  glEnd();
+ 
   glPopMatrix();
   
   if(gdk_gl_drawable_is_double_buffered(gldrawable)) {
@@ -95,14 +156,6 @@ void draw_mesh() {
 	gdk_window_process_updates(EGlobal->target_drawing_area->window, FALSE);
 }
 
-/*****************************************************************************/
-/* this is a handy cross product   (only for 3d)                             */
-/*****************************************************************************/
-void dvector_cross(double* dest, double* a, double* b) {
-  dest[0] = a[1]*b[2] - a[2]*b[1];
-  dest[1] = a[2]*b[0] - a[0]*b[2];
-  dest[2] = a[0]*b[1] - a[1]*b[0];
-}
 
 /*****************************************************************************/
 /* this function draws the polygon ball                                      */
@@ -114,7 +167,6 @@ void update_ball_picture_while_running(execution* E) {
   double diff1[3];
   double diff2[3];
   double normal[3];
-  int offset = 0;
   
   printf("Hey I'm drawing the ball now\n");
   
@@ -163,6 +215,9 @@ void update_ball_picture_while_running(execution* E) {
         }
       }
       if (k <  GLmesh->triangles[i]->num_tris) {
+        //ok the triangle is in there, but we just need to make sure that we
+        //keep is_scl_linear updated
+        GLmesh->triangles[i]->tris[k].is_scl_linear = T->tris[j].is_scl_linear;
         continue;
       } else {
         tri_list_add_copy(GLmesh->triangles[i], &T->tris[j]);
@@ -179,10 +234,14 @@ void update_ball_picture_while_running(execution* E) {
           diff2[k] = point[2][k] - point[0][k];
         }
         dvector_cross(normal, diff1, diff2);
+        //printf("I took the cross of [%f,%f,%f] and [%f,%f,%f] and got [%f,%f,%f]\n",
+        //        diff1[0], diff1[1], diff1[2], 
+        //        diff2[0], diff2[1], diff2[2],
+        //        normal[0], normal[1], normal[2]);
         //if we only swapped one coordinate, we need to 
         //reverse orientation on the normals
         if (i==1 || i==3) {
-          normal[0] = -normal[0]; normal[1] = -normal[1]; normal[2] = -normal[2];
+          normal[0] = -normal[0]; normal[1] = -normal[1]; //normal[2] = -normal[2];
         }
         vert_list_d_add_copy(GLmesh->normals[i], normal);
       }
@@ -339,6 +398,16 @@ static gboolean run_button_press(GtkWidget* widget,
   
   if (event->type == GDK_BUTTON_RELEASE) {
     
+    //if something is running currently, don't do anything
+    if (EGlobal != NULL) {
+      sem_wait(&EGlobal->message_sem);
+      if (EGlobal->status == 1) {
+        sem_post(&EGlobal->message_sem);
+        return TRUE;
+      }
+      sem_post(&EGlobal->message_sem);
+    }
+    
     e1 = (char*)gtk_entry_get_text(fields->entry1);
     e2 = (char*)gtk_entry_get_text(fields->entry2);
     e3 = (char*)gtk_entry_get_text(fields->entry3);
@@ -368,23 +437,99 @@ static gboolean run_button_press(GtkWidget* widget,
       //make the tolerance whatever is in the box
       EGlobal->ball->tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
       pthread_t worker_thread;
+      EGlobal->one_step = 0;
       pthread_create(&worker_thread, NULL, run_execution, (void*)EGlobal);
     
       printf("started computation thread\n");  
     }
   }
-  return TRUE;
+  return FALSE;
 }       
 
 static gboolean pause_button_press(GtkWidget* widget,
                                    GdkEventButton* event,
                                    fieldList* fields) {
-  if (event->type == GDK_BUTTON_RELEASE) {
+  if (event->type == GDK_BUTTON_RELEASE && EGlobal != NULL) {
     sem_wait(&EGlobal->message_sem);
     EGlobal->status_message = 1;
     sem_post(&EGlobal->message_sem);
   }
   return FALSE;
+}
+
+static gboolean step_button_press(GtkWidget* widget,
+                                  GdkEventButton* event,
+                                  fieldList* fields) {
+  if (event->type == GDK_BUTTON_RELEASE && EGlobal != NULL) {
+    sem_wait(&EGlobal->message_sem);
+    if (EGlobal->status == 1) {
+      sem_post(&EGlobal->message_sem);
+      return TRUE;
+    }
+    sem_post(&EGlobal->message_sem);
+    pthread_t worker_thread;
+    EGlobal->one_step = 1;
+    pthread_create(&worker_thread, NULL, run_execution, (void*)EGlobal);    
+  }
+  return FALSE;
+}
+    
+
+static gboolean drawing_motion_notify(GtkWidget* area,
+                                      GdkEventMotion* event,
+                                      fieldList* fields) {
+  GdkModifierType state;
+  int x, y;
+  if (event->is_hint) {
+    gdk_window_get_pointer(event->window, &x, &y, &state);
+  } else {
+    x = event->x;
+    y = event->y;
+    state = event->state;
+  }
+  
+  y = area->allocation.height - event->y;
+  
+  if (state && 
+    (GDK_BUTTON1_MASK || GDK_BUTTON3_MASK)) {
+    if (GDK_BUTTON1_MASK) {
+      dstatus.current_rotation_x = (event->x - dstatus.button1_down_x)/10;
+    //}
+    //if (GDK_BUTTON3_MASK) {
+      dstatus.current_rotation_y = (area->allocation.height - event->y - dstatus.button1_down_y)/10;
+    }
+    draw_mesh();
+    gdk_window_invalidate_rect(area->window, &area->allocation, FALSE);
+	  gdk_window_process_updates(area->window, FALSE);
+  }
+  
+  return FALSE;
+}
+    
+    
+static gboolean drawing_mouse_click(GtkWidget* area,
+                                    GdkEventButton* event,
+                                    fieldList* fields) {
+  if (event->button == 1) { //left button
+    if (event->type == GDK_BUTTON_PRESS) {
+      dstatus.button1_down_x = event->x;
+      dstatus.button1_down_y = area->allocation.height - event->y;
+    } else {
+      dstatus.current_rotation_x = (event->x - dstatus.button1_down_x)/10;
+      dstatus.constant_rotation_x += dstatus.current_rotation_x;
+      dstatus.current_rotation_x = 0;
+      
+      dstatus.current_rotation_y = (area->allocation.height - event->y - dstatus.button1_down_y)/10;
+      dstatus.constant_rotation_y += dstatus.current_rotation_y;
+      dstatus.current_rotation_y = 0;
+      
+      draw_mesh();
+      gdk_window_invalidate_rect(area->window, &area->allocation, FALSE);
+	    gdk_window_process_updates(area->window, FALSE);
+	  }
+  }
+  
+  return TRUE;
 }
 
 
@@ -435,8 +580,9 @@ static gboolean configure(GtkWidget* area,
   }
   glLoadIdentity();
   glViewport(0,0,area->allocation.width, area->allocation.height);
-  glOrtho (-3,3,-3,3,-3,3);
+  glOrtho (-4,4,-4,4,-4,4);
 	glEnable (GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
@@ -448,18 +594,40 @@ static gboolean configure(GtkWidget* area,
   glEnable(GL_LIGHT2);
   glEnable(GL_LIGHT3);
   glEnable(GL_LIGHT4);
+  glEnable(GL_LIGHT5);
+
+  GLfloat lightSpec[] = {0, 0, 0, 1};
+  GLfloat lightDiff[] = {0.5, 0.5, 0.5, 1};
   
-  GLfloat lightPos0[] = { 0, 0, 1, 0 };
-  GLfloat lightPos1[] = { 1, 0, 0, 0 };
-  GLfloat lightPos2[] = { 0, 1, 0, 0 };
-  GLfloat lightPos3[] = { -1, 0, 0, 0 };
-  GLfloat lightPos4[] = { 0, -1, 0, 0 };
-  
+  //put the lights in place
+  GLfloat lightPos0[] = { 0, 0, 1, 0.2 };
+  GLfloat lightPos1[] = { 0, 0, -1, 0.2 };
+  GLfloat lightPos2[] = { 1, 0, 0, 0.2 };
+  GLfloat lightPos3[] = { -1, 0, 0, 0.2 };
+  GLfloat lightPos4[] = { 0, 1, 0, 0.2 };
+  GLfloat lightPos5[] = { 0, -1, 0, 0.2 };
   glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
   glLightfv(GL_LIGHT1, GL_POSITION, lightPos1);
   glLightfv(GL_LIGHT2, GL_POSITION, lightPos2);
   glLightfv(GL_LIGHT3, GL_POSITION, lightPos3);
   glLightfv(GL_LIGHT4, GL_POSITION, lightPos4);
+  glLightfv(GL_LIGHT5, GL_POSITION, lightPos5);
+  
+  
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiff);  
+  glLightfv(GL_LIGHT1, GL_DIFFUSE, lightDiff);  
+  glLightfv(GL_LIGHT2, GL_DIFFUSE, lightDiff);  
+  glLightfv(GL_LIGHT3, GL_DIFFUSE, lightDiff);  
+  glLightfv(GL_LIGHT4, GL_DIFFUSE, lightDiff);
+  glLightfv(GL_LIGHT5, GL_DIFFUSE, lightDiff);
+  
+  glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpec);
+  glLightfv(GL_LIGHT1, GL_SPECULAR, lightSpec);
+  glLightfv(GL_LIGHT2, GL_SPECULAR, lightSpec);
+  glLightfv(GL_LIGHT3, GL_SPECULAR, lightSpec);
+  glLightfv(GL_LIGHT4, GL_SPECULAR, lightSpec);
+  glLightfv(GL_LIGHT5, GL_SPECULAR, lightSpec);
+  
         
   //glBegin (GL_LINES);
 	//glColor3f (1., 0., 0.);
@@ -475,6 +643,9 @@ static gboolean configure(GtkWidget* area,
 	gdk_gl_drawable_gl_end(gldrawable);
 	
 	printf("Configured opengl\n");
+	
+	dstatus.current_rotation_x = 0;
+	dstatus.current_rotation_y = 0;
 	
 	gdk_window_invalidate_rect(area->window, &area->allocation, FALSE);
 	gdk_window_process_updates(area->window, FALSE);
@@ -511,6 +682,7 @@ int main(int argc, char* argv[]) {
   GtkWidget* run_pause_box;
   GtkWidget* run_button;
   GtkWidget* pause_button;
+  GtkWidget* step_button;
   GtkWidget* tol_entry_box;
   GtkEntryBuffer* tol_text;
   GtkWidget* tolerance_entry;
@@ -542,6 +714,7 @@ int main(int argc, char* argv[]) {
   run_pause_box = gtk_hbox_new(FALSE, 0);
   run_button = gtk_button_new_with_label("run");
   pause_button = gtk_button_new_with_label("pause");
+  step_button = gtk_button_new_with_label("step");
   tol_entry_box = gtk_hbox_new(FALSE, 0);
   tol_text = gtk_entry_buffer_new(NULL, -1);
   tolerance_entry = gtk_entry_new_with_buffer(tol_text);
@@ -554,6 +727,7 @@ int main(int argc, char* argv[]) {
   gtk_box_pack_start(GTK_BOX(control_box), chain3_entry, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(run_pause_box), run_button, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(run_pause_box), pause_button, TRUE, TRUE, 0);
+  gtk_box_pack_start(GTK_BOX(run_pause_box), step_button, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), run_pause_box, FALSE, FALSE, 0);
   //gtk_box_pack_start(GTK_BOX(tol_entry_box), tolerance_entry, FALSE, FALSE, 0);
   //gtk_widget_set_size_request(tol_entry_box, 20, 40);
@@ -588,6 +762,24 @@ int main(int argc, char* argv[]) {
                    "expose-event",
                    G_CALLBACK(expose),
                    NULL);
+  g_signal_connect(GTK_OBJECT(drawing_area),
+                   "button_press_event",
+                   G_CALLBACK(drawing_mouse_click),
+                   NULL);
+  g_signal_connect(GTK_OBJECT(drawing_area),
+                   "button_release_event",
+                   G_CALLBACK(drawing_mouse_click),
+                   NULL);
+  g_signal_connect(GTK_OBJECT(drawing_area),
+                   "motion_notify_event",
+                   G_CALLBACK(drawing_motion_notify),
+                   NULL);
+  gtk_widget_add_events(drawing_area, GDK_CONFIGURE
+                                    | GDK_BUTTON_PRESS_MASK 
+                                    | GDK_BUTTON_RELEASE_MASK
+                                    | GDK_POINTER_MOTION_MASK 
+                                    | GDK_POINTER_MOTION_HINT_MASK);
+  
            
   fieldList fields;
   fields.entry1 = GTK_ENTRY(chain1_entry);
@@ -600,6 +792,13 @@ int main(int argc, char* argv[]) {
   gtk_widget_add_events(run_button, GDK_BUTTON_RELEASE_MASK
                                   | GDK_BUTTON_PRESS_MASK
                                   | GDK_LEAVE_NOTIFY_MASK);
+  gtk_widget_add_events(pause_button, GDK_BUTTON_RELEASE_MASK
+                                  | GDK_BUTTON_PRESS_MASK
+                                  | GDK_LEAVE_NOTIFY_MASK);
+  gtk_widget_add_events(step_button, GDK_BUTTON_RELEASE_MASK
+                                  | GDK_BUTTON_PRESS_MASK
+                                  | GDK_LEAVE_NOTIFY_MASK);
+  //buttons
   gtk_signal_connect(GTK_OBJECT(run_button),
                      "button_press_event",
                      G_CALLBACK(run_button_press),
@@ -607,6 +806,14 @@ int main(int argc, char* argv[]) {
   gtk_signal_connect(GTK_OBJECT(run_button),
                      "button_release_event",
                      G_CALLBACK(run_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(step_button),
+                     "button_press_event",
+                     G_CALLBACK(step_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(step_button),
+                     "button_release_event",
+                     G_CALLBACK(step_button_press),
                      &fields);
   gtk_signal_connect(GTK_OBJECT(pause_button),
                      "button_press_event",

@@ -46,21 +46,23 @@ typedef struct {
   double** verts;
   int num_verts;
 } vert_list_d;
- 
- double triangle_area(vert_list* V, triangle* T);
- void tri_list_add_copy(tri_list* T, triangle* t);
- void tri_list_print(tri_list* T, vert_list* V);
- void tri_list_print_d(tri_list* T, vert_list_d* V);
- void tri_list_delete_index(tri_list* T, int index);
- void tri_list_delete_indices(tri_list* T, int ind1, int ind2);
- void rvector_init(rvector* v, int len) ;
- void rvector_free(rvector* v);
- void rvector_sub(rvector* dest, rvector* a, rvector* b);
- void rvector_dot(mpq_t ans, rvector* v1, rvector* v2);
- void rvector_print(rvector* v);
- void rvector_cross(rvector* c, rvector* v1, rvector* v2);
- void vert_list_add_copy(vert_list* V, rvector* v);
- void vert_list_d_add_copy(vert_list_d* V, double* v);
- void vert_list_d_delete_index(vert_list_d* V, int ind);
+
+void dvector_cross(double* dest, double* a, double* b);
+double dvector_dot(double* a, double* b);
+double triangle_area(vert_list* V, triangle* T);
+void tri_list_add_copy(tri_list* T, triangle* t);
+void tri_list_print(tri_list* T, vert_list* V);
+void tri_list_print_d(tri_list* T, vert_list_d* V);
+void tri_list_delete_index(tri_list* T, int index);
+void tri_list_delete_indices(tri_list* T, int ind1, int ind2);
+void rvector_init(rvector* v, int len) ;
+void rvector_free(rvector* v);
+void rvector_sub(rvector* dest, rvector* a, rvector* b);
+void rvector_dot(mpq_t ans, rvector* v1, rvector* v2);
+void rvector_print(rvector* v);
+void rvector_cross(rvector* c, rvector* v1, rvector* v2);
+void vert_list_add_copy(vert_list* V, rvector* v);
+void vert_list_d_add_copy(vert_list_d* V, double* v);
+void vert_list_d_delete_index(vert_list_d* V, int ind);
  
  #endif

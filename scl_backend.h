@@ -90,6 +90,7 @@ typedef struct {
   sem_t message_sem;         //this blocks for message passing
   
   //message stuff (should be blocked by message_sem)
+  int one_step;              //note really a message -- must be set at the beginning -- only do one step
   int status;                //1 means currently running, 0 means not
   int status_message;        //1 means stop, 0 means continue
   int new_tolerance_check;  //1 means there is a new tolerance 0 means nope

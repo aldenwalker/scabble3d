@@ -834,7 +834,10 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
   //find out where the new vertex is in the triangle
   vert_in_edge = find_edge_for_vertex(V, &(T->tris[split_ind]), new_vert);
   
-  printf("I'm splitting the triangle -- looks like the new vert is in edge %d\n", vert_in_edge);
+  printf("I'm splitting the triangle [%d,%d,%d]-- looks like the new vert is in edge %d\n", T->tris[split_ind].verts[0],
+                                                                                            T->tris[split_ind].verts[1],
+                                                                                            T->tris[split_ind].verts[2],
+                                                                                            vert_in_edge);
   
   if (vert_in_edge == 3) {  //it's in the interior
     //if the triangle is 0 1 2, and the new vertex is x, then
@@ -844,6 +847,9 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
       temp_tri.verts[1] = T->tris[split_ind].verts[(j+1)%3];
       temp_tri.verts[2] = new_vert;
       temp_tri.area = triangle_area(V, &temp_tri);
+      printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                     temp_tri.verts[1],
+                                                     temp_tri.verts[2]);
       tri_list_add_copy(T, &temp_tri);
     }
     //get rid of the triangle that we split
@@ -857,11 +863,17 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
     temp_tri.verts[1] = T->tris[split_ind].verts[(vert_in_edge+2)%3];
     temp_tri.verts[2] = new_vert;
     temp_tri.area = triangle_area(V, &temp_tri);
+    printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                   temp_tri.verts[1],
+                                                   temp_tri.verts[2]);
     tri_list_add_copy(T, &temp_tri);
     temp_tri.verts[0] = T->tris[split_ind].verts[(vert_in_edge+2)%3];
     temp_tri.verts[1] = T->tris[split_ind].verts[vert_in_edge];
     temp_tri.verts[2] = new_vert;
     temp_tri.area = triangle_area(V, &temp_tri);
+    printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                   temp_tri.verts[1],
+                                                   temp_tri.verts[2]);
     tri_list_add_copy(T, &temp_tri);
     
     printf("Added two triangles == current length is %d\n", T->num_tris);
@@ -873,16 +885,24 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
       for (k=0; k<3; k++) {
         if (   T->tris[j].verts[k] == edge_vert2 
             && T->tris[j].verts[(k+1)%3] == edge_vert1) {
-          printf("looks like I found the other triangle -- edge %d in triangle %d\n", k, j);
+          printf("looks like I found the other triangle -- edge %d in triangle %d - [%d,%d,%d]\n", k, j, T->tris[j].verts[0],
+                                                                                                         T->tris[j].verts[1],
+                                                                                                         T->tris[j].verts[2]);
           temp_tri.verts[0] = T->tris[j].verts[(k+1)%3];
           temp_tri.verts[1] = T->tris[j].verts[(k+2)%3];
           temp_tri.verts[2] = new_vert;
           temp_tri.area = triangle_area(V, &temp_tri);
+          printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                         temp_tri.verts[1],
+                                                         temp_tri.verts[2]);
           tri_list_add_copy(T, &temp_tri);
           temp_tri.verts[0] = T->tris[j].verts[(k+2)%3];
           temp_tri.verts[1] = T->tris[j].verts[k];
           temp_tri.verts[2] = new_vert;
           temp_tri.area = triangle_area(V, &temp_tri);
+          printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                         temp_tri.verts[1],
+                                                         temp_tri.verts[2]);
           tri_list_add_copy(T, &temp_tri);
           break;
         }
@@ -1061,7 +1081,7 @@ void* run_execution(void* E_void) {
   //set the status to running
   sem_wait(&(E->message_sem));
   E->status = 1;
-  E->status_message = 0;
+  E->status_message = (E->one_step == 1 ? 1 : 0);
   sem_post(&(E->message_sem));
   printf("*Done\n");
   
@@ -1369,6 +1389,7 @@ void computation_init(execution* E,
   //set up the execution structure
   E->status = 0;
   E->status_message = 0;
+  E->one_step = 0;
   E->new_tolerance_check = 0;
   E->skip_orthant = 0;
   E->solver = solver;

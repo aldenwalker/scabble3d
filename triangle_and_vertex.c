@@ -14,23 +14,42 @@
 
 #include "triangle_and_vertex.h"
 
+/*****************************************************************************/
+/* this is a handy cross product   (only for 3d)                             */
+/*****************************************************************************/
+void dvector_cross(double* dest, double* a, double* b) {
+  dest[0] = a[1]*b[2] - a[2]*b[1];
+  dest[1] = a[2]*b[0] - a[0]*b[2];
+  dest[2] = a[0]*b[1] - a[1]*b[0];
+}
+
+double dvector_dot(double* a, double* b) {
+  return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
 double triangle_area(vert_list* V, triangle* T) {
-  double base[3];
-  double height[3];
-  double base_len = 0;
-  double height_len = 0;
+  double side1[3];
+  double side2[3];
+  double side1_len = 0;
+  double side2_len = 0;
+  double dp;
+  double angle = 0;
   int i;
   
   for (i=0; i<3; i++) {
-    base[i] = mpq_get_d(V->verts[ T->verts[1] ].coord[i]) -  
+    side1[i] = mpq_get_d(V->verts[ T->verts[1] ].coord[i]) -  
               mpq_get_d(V->verts[ T->verts[0] ].coord[i]);
-    height[i] = mpq_get_d(V->verts[ T->verts[2] ].coord[i]) - (0.5*base[i] + mpq_get_d(V->verts[ T->verts[0] ].coord[i]));
-    
-    base_len += base[i]*base[i];
-    height_len += height[i]*height[i];
+    side2[i] = mpq_get_d(V->verts[ T->verts[2] ].coord[i]) - 
+               mpq_get_d(V->verts[ T->verts[0] ].coord[i]);
+    side1_len += side1[i]*side1[i];
+    side2_len += side2[i]*side2[i];
   }
+  side1_len = sqrt(side1_len);
+  side2_len = sqrt(side2_len);
+  dp = dvector_dot(side1, side2);
+  angle = acos( dp / (side1_len*side2_len) );  
   
-  return 0.5 * sqrt(base_len) * sqrt(height_len);
+  return 0.5 * side1_len * side2_len * sin(angle);
 }
 
 
@@ -53,6 +72,7 @@ void tri_list_add_copy(tri_list* T, triangle* t) {
 
 void tri_list_delete_index(tri_list* T, int index) {
   int i;
+  printf("I'm deleting the triangle at position %d\n", index);
   free(T->tris[index].verts);
   for (i = index; i<T->num_tris-1; i++) {
     T->tris[i] = T->tris[i+1];
@@ -63,7 +83,7 @@ void tri_list_delete_index(tri_list* T, int index) {
 }
 
 void tri_list_delete_indices(tri_list* T, int ind1, int ind2) {
-  int min_ind = (ind1 > ind2 ? ind2 : ind2);
+  int min_ind = (ind1 > ind2 ? ind2 : ind1);
   int max_ind = (ind1 > ind2 ? ind1 : ind2);
   tri_list_delete_index(T, max_ind);
   tri_list_delete_index(T, min_ind);
@@ -212,7 +232,7 @@ void tri_list_print_d(tri_list* T, vert_list_d* V) {
     printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[1]][0], 
                           V->verts[T->tris[i].verts[1]][1], 
                           V->verts[T->tris[i].verts[1]][2]);
-    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[2]][0], 
+    printf("[%f,%f,%f]\n", V->verts[T->tris[i].verts[2]][0], 
                           V->verts[T->tris[i].verts[2]][1], 
                           V->verts[T->tris[i].verts[2]][2]);
 
