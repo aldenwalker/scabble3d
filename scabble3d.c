@@ -52,8 +52,12 @@ execution* EGlobal = NULL;
 /* this function draws the opengl scene                                      */
 /*****************************************************************************/
 void draw_mesh() {
-  int i,j,orth;
+  int i,j,k,orth;
   GdkGLDrawable* gldrawable = gdk_pixmap_get_gl_drawable(pixmap);
+  double normal[3];
+  double triangle[3][3];
+  double temp_d;
+  
   
   if (!gdk_gl_drawable_gl_begin(gldrawable, GLContext)) {
     printf("Couldn't start opengl drawing\n");
@@ -64,8 +68,8 @@ void draw_mesh() {
   glMatrixMode(GL_MODELVIEW);
   glPushMatrix();
   
-  GLfloat blueish[] = {0.6, 0.6, 0.9, 1};
-  GLfloat redish[] = {0.9, 0.6, 0.6, 1};
+  GLfloat blueish[] = {0.2, 0.2, 1, 1};
+  GLfloat redish[] = {1, 0.2, 0.2, 1};
   GLfloat red[] = {1,0,0,1};
   GLfloat green[] = {0,1,0,1};
   GLfloat blue[] = {0,0,1,1};
@@ -90,7 +94,7 @@ void draw_mesh() {
     glVertex3f(0,0,0);
     glVertex3f(0,0,4);
   glEnd();
-
+  
   
   //go through the triangles and print them
   //I want to make this more efficient
@@ -104,36 +108,55 @@ void draw_mesh() {
       } else {
         glMaterialfv(GL_FRONT, GL_DIFFUSE, redish);
       }
+      
+      //load the normal and triangle
+      for (j=0; j<3; j++) {
+        normal[j] = GLmesh->normals[orth]->verts[i][j];
+        for (k=0; k<3; k++) {
+          triangle[j][k] =  GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][k];
+        }
+      }
+      //if we're doing orthants 1 or 3, then we need to swap the orientation of
+      //the triangle and reverse the normal
+      if (orth==1 || orth==2) {
+        for (j=0; j<3; j++) {
+          normal[j] = -normal[j];
+          temp_d = triangle[1][j];
+          triangle[1][j] = triangle[2][j];
+          triangle[2][j] = temp_d;
+        }
+      }
+      
       glBegin(GL_TRIANGLES);
       //FRONT
-      printf("Normal: [%f,%f,%f]\n", GLmesh->normals[orth]->verts[i][0], 
-                                     GLmesh->normals[orth]->verts[i][1], 
-                                     GLmesh->normals[orth]->verts[i][2]);
-      glNormal3f(GLmesh->normals[orth]->verts[i][0], 
-                 GLmesh->normals[orth]->verts[i][1], 
-                 GLmesh->normals[orth]->verts[i][2]);
+      //printf("Normal: [%f,%f,%f]\n", normal[0], 
+      //                               normal[1], 
+      //                               normal[2]);
+      glNormal3f(normal[0], 
+                 normal[1], 
+                 normal[2]);
       for (j=0; j<3; j++) {
-        printf("\t\tVertex: [%f,%f,%f]\n", GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
-                                        GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
-                                        GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
-        glVertex3f( GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
-                    GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
-                    GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
+        //printf("\t\tVertex: [%f,%f,%f]\n", triangle[j][0],
+        //                                   triangle[j][1],
+        //                                   triangle[j][2] );
+        glVertex3f( triangle[j][0],
+                    triangle[j][1],
+                    triangle[j][2] );
       }
       //BACK
-      printf("Normal: [%f,%f,%f]\n", -GLmesh->normals[orth]->verts[i][0], 
-                                     -GLmesh->normals[orth]->verts[i][1], 
-                                     -GLmesh->normals[orth]->verts[i][2]);      
-      glNormal3f(-GLmesh->normals[orth]->verts[i][0], 
-                 -GLmesh->normals[orth]->verts[i][1], 
-                 -GLmesh->normals[orth]->verts[i][2]);
+      //printf("Normal: [%f,%f,%f]\n", -GLmesh->normals[orth]->verts[i][0], 
+      //                               -GLmesh->normals[orth]->verts[i][1], 
+      //                               -GLmesh->normals[orth]->verts[i][2]);      
+      glNormal3f(-normal[0], 
+                 -normal[1], 
+                 -normal[2]);
       for (j=0; j<3; j++) {
-        printf("\t\tVertex: [%f,%f,%f]\n", -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
-                                        -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
-                                        -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
-        glVertex3f( -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
-                    -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
-                    -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
+        //printf("\t\tVertex: [%f,%f,%f]\n", -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][0],
+        //                                -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][1],
+        //                                -GLmesh->vertices[orth]->verts[ GLmesh->triangles[orth]->tris[i].verts[j] ][2] );
+        glVertex3f( -triangle[j][0],
+                    -triangle[j][1],
+                    -triangle[j][2] );
       }
       glEnd();
           
@@ -221,11 +244,11 @@ void update_ball_picture_while_running(execution* E) {
         continue;
       } else {
         tri_list_add_copy(GLmesh->triangles[i], &T->tris[j]);
-        //add the normal
         for (k=0; k<3; k++) {
           for (l=0; l<3; l++) {
             point[k][l] = mpq_get_d(V->verts[T->tris[j].verts[k]].coord[l]); 
           }
+          //we don't need to 
           point[k][0] = ((i&1)==1 ? -point[k][0] : point[k][0]);
           point[k][1] = (((i>>1)&1)==1 ? -point[k][1] : point[k][1]);
         }
@@ -240,9 +263,9 @@ void update_ball_picture_while_running(execution* E) {
         //        normal[0], normal[1], normal[2]);
         //if we only swapped one coordinate, we need to 
         //reverse orientation on the normals
-        if (i==1 || i==3) {
-          normal[0] = -normal[0]; normal[1] = -normal[1]; //normal[2] = -normal[2];
-        }
+        //if (i==1 || i==3) {
+        //  normal[0] = -normal[0]; normal[1] = -normal[1]; //normal[2] = -normal[2];
+        //}
         vert_list_d_add_copy(GLmesh->normals[i], normal);
       }
     }
@@ -423,6 +446,7 @@ static gboolean run_button_press(GtkWidget* widget,
         printf("You forgot a chain or something\n");
         return TRUE;
       }
+      printf("Looks like you want to restart a different computation\n"); fflush(stdout);
       double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
       load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
                           (char*)gtk_entry_get_text(fields->entry2),
@@ -438,6 +462,7 @@ static gboolean run_button_press(GtkWidget* widget,
       EGlobal->ball->tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
       pthread_t worker_thread;
       EGlobal->one_step = 0;
+      EGlobal->status_message = 0;
       pthread_create(&worker_thread, NULL, run_execution, (void*)EGlobal);
     
       printf("started computation thread\n");  
@@ -480,6 +505,9 @@ static gboolean drawing_motion_notify(GtkWidget* area,
                                       fieldList* fields) {
   GdkModifierType state;
   int x, y;
+  if (EGlobal == NULL) {
+    return TRUE;
+  }
   if (event->is_hint) {
     gdk_window_get_pointer(event->window, &x, &y, &state);
   } else {
@@ -510,6 +538,9 @@ static gboolean drawing_motion_notify(GtkWidget* area,
 static gboolean drawing_mouse_click(GtkWidget* area,
                                     GdkEventButton* event,
                                     fieldList* fields) {
+  if (EGlobal == NULL) {
+    return TRUE;
+  }
   if (event->button == 1) { //left button
     if (event->type == GDK_BUTTON_PRESS) {
       dstatus.button1_down_x = event->x;
@@ -590,29 +621,29 @@ static gboolean configure(GtkWidget* area,
   
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
-  glEnable(GL_LIGHT1);
-  glEnable(GL_LIGHT2);
-  glEnable(GL_LIGHT3);
-  glEnable(GL_LIGHT4);
+  //glEnable(GL_LIGHT1);
+  //glEnable(GL_LIGHT2);
+  //glEnable(GL_LIGHT3);
+  //glEnable(GL_LIGHT4);
   glEnable(GL_LIGHT5);
 
-  GLfloat lightSpec[] = {0, 0, 0, 1};
-  GLfloat lightDiff[] = {0.5, 0.5, 0.5, 1};
+  GLfloat lightSpec[] = {0.2, 0.2, 0.2, 1};
+  GLfloat lightDiff[] = {0.7, 0.7, 0.7, 1};
+  GLfloat lightAmbient[] = {0.5, 0.5, 0.5, 1};
   
   //put the lights in place
-  GLfloat lightPos0[] = { 0, 0, 1, 0.2 };
-  GLfloat lightPos1[] = { 0, 0, -1, 0.2 };
-  GLfloat lightPos2[] = { 1, 0, 0, 0.2 };
-  GLfloat lightPos3[] = { -1, 0, 0, 0.2 };
-  GLfloat lightPos4[] = { 0, 1, 0, 0.2 };
-  GLfloat lightPos5[] = { 0, -1, 0, 0.2 };
+  GLfloat lightPos0[] = { 0, 0, 1, 0 };
+  GLfloat lightPos1[] = { 1, 0, 0, 0 };
+  GLfloat lightPos2[] = { 0, 1, 0, 0 };
+  GLfloat lightPos3[] = { -1, 0, 0, 0 };
+  GLfloat lightPos4[] = { 0, -1, 0, 0 };
+  GLfloat lightPos5[] = { 0, 0, -1, 0 };
   glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
   glLightfv(GL_LIGHT1, GL_POSITION, lightPos1);
   glLightfv(GL_LIGHT2, GL_POSITION, lightPos2);
   glLightfv(GL_LIGHT3, GL_POSITION, lightPos3);
   glLightfv(GL_LIGHT4, GL_POSITION, lightPos4);
   glLightfv(GL_LIGHT5, GL_POSITION, lightPos5);
-  
   
   glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiff);  
   glLightfv(GL_LIGHT1, GL_DIFFUSE, lightDiff);  
@@ -627,6 +658,13 @@ static gboolean configure(GtkWidget* area,
   glLightfv(GL_LIGHT3, GL_SPECULAR, lightSpec);
   glLightfv(GL_LIGHT4, GL_SPECULAR, lightSpec);
   glLightfv(GL_LIGHT5, GL_SPECULAR, lightSpec);
+  
+  glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+  glLightfv(GL_LIGHT1, GL_AMBIENT, lightAmbient);
+  glLightfv(GL_LIGHT2, GL_AMBIENT, lightAmbient);
+  glLightfv(GL_LIGHT3, GL_AMBIENT, lightAmbient);
+  glLightfv(GL_LIGHT4, GL_AMBIENT, lightAmbient);
+  glLightfv(GL_LIGHT5, GL_AMBIENT, lightAmbient);
   
         
   //glBegin (GL_LINES);
@@ -685,8 +723,9 @@ int main(int argc, char* argv[]) {
   GtkWidget* step_button;
   GtkWidget* tol_entry_box;
   GtkEntryBuffer* tol_text;
+  GtkWidget* tol_label;
   GtkWidget* tolerance_entry;
-  GtkWidget* change_tol_button;
+  //GtkWidget* change_tol_button;
   
   gtk_init(&argc, &argv);
     
@@ -717,24 +756,22 @@ int main(int argc, char* argv[]) {
   step_button = gtk_button_new_with_label("step");
   tol_entry_box = gtk_hbox_new(FALSE, 0);
   tol_text = gtk_entry_buffer_new(NULL, -1);
+  tol_label = gtk_label_new("Tolerance:");
   tolerance_entry = gtk_entry_new_with_buffer(tol_text);
-  change_tol_button = gtk_button_new_with_label("change tol.");
+  //change_tol_button = gtk_button_new_with_label("change tol.");
   
   
   //build the sidebar
   gtk_box_pack_start(GTK_BOX(control_box), chain1_entry, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), chain2_entry, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), chain3_entry, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(tol_entry_box), tol_label, FALSE, FALSE, 0); 
+  gtk_box_pack_start(GTK_BOX(tol_entry_box), tolerance_entry, TRUE, TRUE, 0);
+  gtk_box_pack_start(GTK_BOX(control_box), tol_entry_box, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(run_pause_box), run_button, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(run_pause_box), pause_button, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(run_pause_box), step_button, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), run_pause_box, FALSE, FALSE, 0);
-  //gtk_box_pack_start(GTK_BOX(tol_entry_box), tolerance_entry, FALSE, FALSE, 0);
-  //gtk_widget_set_size_request(tol_entry_box, 20, 40);
-  //gtk_box_pack_start(GTK_BOX(tol_entry_box), change_tol_button, FALSE, FALSE, 0);
-  //gtk_box_pack_start(GTK_BOX(control_box), tol_entry_box, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(control_box), tolerance_entry, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(control_box), change_tol_button, FALSE, FALSE, 0);
   
   //put them together
   gtk_box_pack_start(GTK_BOX(hBox), drawing_area, TRUE, TRUE, 0);

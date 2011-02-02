@@ -1087,6 +1087,9 @@ void* run_execution(void* E_void) {
   
   sem_wait(&(E->running_sem));
   
+  //reset the ball to not done
+  E->ball->is_complete = 0;  
+ 
   //enter the main loop:
   while (1) {
     //compute the next triangle
