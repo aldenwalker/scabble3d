@@ -10,7 +10,7 @@ typedef struct {
   vert_list_d* vertices[4];
 } ball_mesh;
 
-void update_ball_picture_while_running(execution* E);
+guint update_ball_picture_while_running(execution* E);
 
 
 #endif 

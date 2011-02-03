@@ -7,6 +7,7 @@
 #include <gtk/gtk.h>
 #include <gtk/gtkgl.h>
 #include <GL/gl.h>
+//#include <GL/glu.h>
 #include <gmp.h>
 
 #include "scabble3d.h"
@@ -44,6 +45,7 @@ struct {
 } dstatus;
 
 //these are the opengl globals that I think I need
+GdkGLConfig* glconfig = NULL; 
 GdkPixmap* pixmap = NULL;
 GdkGLPixmap* GLPixmap = NULL;
 GdkGLContext* GLContext = NULL;
@@ -194,7 +196,7 @@ void draw_mesh() {
 /*****************************************************************************/
 /* this function draws the polygon ball                                      */
 /*****************************************************************************/
-void update_ball_picture_while_running(execution* E) {
+guint update_ball_picture_while_running(execution* E) {
   int i,j,k,l;
   double new_vert[3];
   double point[3][3];
@@ -287,6 +289,7 @@ void update_ball_picture_while_running(execution* E) {
   
   sem_post(&(E->read_data_sem));
   
+  return FALSE;
 
 }
 
@@ -755,22 +758,15 @@ static gboolean configure(GtkWidget* area,
                           GdkEventConfigure* event,
                           gpointer data) {
                           
-  if (pixmap) {
-    g_object_unref(pixmap);
+  GdkGLDrawable* gldrawable = NULL;
+  if (pixmap != NULL) {
+    //g_object_unref(pixmap);
   }
   pixmap = gdk_pixmap_new(area->window,
                           area->allocation.width,
                           area->allocation.height,
                           -1);
-  GdkGLConfig* glconfig;   
-  
-  if (VERBOSE) {
-    printf("About to create gl config\n");
-    fflush(stdout);
-  }
-  glconfig = gdk_gl_config_new_by_mode(GDK_GL_MODE_RGB |
-                                       GDK_GL_MODE_DEPTH |
-                                       GDK_GL_MODE_SINGLE); 
+
                                        
   //this returns the GdkGLPixmap, but we don't care, because we can get it 
   //out later
@@ -778,25 +774,31 @@ static gboolean configure(GtkWidget* area,
     printf("About to create GLE pixmap from the gdk pixmap\n");
     fflush(stdout);
   }
-  GLPixmap = gdk_pixmap_set_gl_capability(pixmap,
+  //GLPixmap = 
+  
+  gldrawable = GDK_GL_DRAWABLE(gdk_pixmap_set_gl_capability(pixmap,
                                            glconfig,
-                                           NULL);
-  if (GLPixmap == NULL) {
-    printf("Couldn't initialize opengl pixmap\n");
-  }                                          
+                                           NULL));
+  //if (GLPixmap == NULL) {
+  //  printf("Couldn't initialize opengl pixmap\n");
+  //}                                          
   if (VERBOSE) {
     printf("created opengl pixmap\n");
     fflush(stdout);
-  }  
-  
-  GdkGLDrawable* gldrawable = gdk_pixmap_get_gl_drawable(pixmap);
+  }
+  //exit(1);
   
   if (VERBOSE) {printf("I'm about to create the opengl context\n"); fflush(stdout); }
   GLContext = gdk_gl_context_new(gldrawable,
                                  NULL,
-                                 FALSE,
-                                 GDK_GL_RGBA_TYPE);                                        
+                                 TRUE,
+                                 GDK_GL_RGBA_TYPE);      
+  if (GLContext == NULL) {
+    printf("Couldn't create opengl context!\n");
+  }
   if (VERBOSE) {printf("made it\n"); fflush(stdout); }
+  
+  //exit(1);
   
   if (!gdk_gl_drawable_gl_begin(gldrawable, GLContext)) {
     printf("Couldn't start opengl drawing\n");
@@ -865,6 +867,7 @@ static gboolean configure(GtkWidget* area,
 	//glVertex3f (1., 0., 0.);
 	//glEnd ();
   
+  
   if(gdk_gl_drawable_is_double_buffered(gldrawable)) {
     gdk_gl_drawable_swap_buffers(gldrawable);
   } else {
@@ -872,6 +875,8 @@ static gboolean configure(GtkWidget* area,
 	}
 	gdk_gl_drawable_gl_end(gldrawable);
 	
+  //exit(1);
+  
 	if (VERBOSE)
 	  printf("Configured opengl\n");
 	
@@ -881,6 +886,8 @@ static gboolean configure(GtkWidget* area,
 	gdk_window_invalidate_rect(area->window, &area->allocation, FALSE);
 	gdk_window_process_updates(area->window, FALSE);
 	
+  //exit(1);
+  
 	return TRUE;
 }
   
@@ -897,8 +904,6 @@ static void destroy(GtkWidget* widget, gpointer data) {
 
 
 int main(int argc, char* argv[]) {
-
-
   //main areas
   GtkWidget* window;
   GtkWidget* hBox;
@@ -948,12 +953,31 @@ int main(int argc, char* argv[]) {
     printf("inited opengl\n");
     fflush(stdout);
   }
+  
+  if (VERBOSE) {
+    printf("about to get the gl config\n");
+    fflush(stdout);
+  }
+  glconfig = gdk_gl_config_new_by_mode(GDK_GL_MODE_RGB |
+                                                    GDK_GL_MODE_DEPTH |
+                                                    GDK_GL_MODE_SINGLE); 
+  if (VERBOSE) {
+    printf("Got it\n");
+    fflush(stdout);
+  }
      
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+  gtk_window_set_title(GTK_WINDOW(window), "scabble3d");
+  
+  //set the colormap for opengl
+  gtk_widget_set_colormap (window,
+                           gdk_gl_config_get_colormap (glconfig));
   
   //make the main drawing area
   drawing_area = gtk_drawing_area_new();
   gtk_widget_set_size_request(drawing_area, 800, 800); 
+  gtk_widget_set_colormap (drawing_area,
+                           gdk_gl_config_get_colormap (glconfig));
   
   //this holds everything
   hBox = gtk_hbox_new(FALSE, 0);
