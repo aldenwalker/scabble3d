@@ -432,6 +432,33 @@ void load_inputs_and_run(char* arg1,
     printf("started computation thread\n");
   
 }
+
+/*****************************************************************************/
+/* find the rank (count the number of distinct letters)                      */
+/*****************************************************************************/
+int find_rank(char* e1, char* e2, char* e3) {
+  char letters[20];
+  int i,j,which;
+  char* es[3] = {e1, e2, e3};
+  int l[3] = { strlen(e1), strlen(e2), strlen(e3) };
+  letters[0] = '\0';
+  for (which=0; which<3; which++) {
+    for (i=0; i<l[which]; i++) {
+      j=0;
+      while (letters[j] != '\0') {
+        if (letters[j] == es[which][i]) {
+          break;
+        }
+        j++;
+      }
+      if (letters[j] == '\0') {
+        letters[j] = es[which][i];
+        letters[j+1] = '\0';
+      }
+    }
+  }
+  return strlen(letters)/2;
+}
   
   
 /*****************************************************************************/
@@ -443,6 +470,7 @@ static gboolean run_button_press(GtkWidget* widget,
   char* e1;
   char* e2;
   char* e3;
+  int rank;
   
   //if we're just pressing, don't do anything
   if (event->type == GDK_BUTTON_PRESS) {
@@ -465,14 +493,18 @@ static gboolean run_button_press(GtkWidget* widget,
   e2 = (char*)gtk_entry_get_text(fields->entry2);
   e3 = (char*)gtk_entry_get_text(fields->entry3);
   
+  //find the rank
+  rank = find_rank(e1, e2, e3);  
+  if (VERBOSE) printf("I found the rank to be %d\n", rank);
+  
   //check if either: we don't have any execution, or we've changed the inputs
   //so we have to re-init
   if (EGlobal == NULL || 
        (strcmp(EGlobal->initial_arguments[0], e1)!=0
         || strcmp(EGlobal->initial_arguments[1], e2)!=0
         || strcmp(EGlobal->initial_arguments[2], e3)!=0
-        || (EGlobal->maxjun == 5 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)))
-        || (EGlobal->maxjun == 4 && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check))) ) ) {
+        || (EGlobal->maxjun == 2*rank+1 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)))
+        || (EGlobal->maxjun == 2*rank && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check))) ) ) {
   
      if (strlen(e1) == 0
         || strlen(e2) == 0
@@ -488,7 +520,7 @@ static gboolean run_button_press(GtkWidget* widget,
                         (char*)gtk_entry_get_text(fields->entry2),
                         (char*)gtk_entry_get_text(fields->entry3),
                         tolerance,
-                        (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)) ? 5 : 4),
+                        (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)) ? 2*rank+1 : 2*rank),
                         EXLP,
                         fields->drawing);
                         
