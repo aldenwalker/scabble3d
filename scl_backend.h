@@ -101,7 +101,9 @@ typedef struct {
                            //note that the worker thread is waiting for this
   char* initial_arguments[3];         
   
-  int maxjun;           //whether or not we have -m5                
+  int maxjun;           //whether or not we have -m5      
+  
+  int VERBOSE;          //whether the execution should print lots of crap
    
   GtkWidget* target_drawing_area; //this is the widget to draw to
   
@@ -145,7 +147,8 @@ void scl_problem_init(scl_problem* scl_prob,
                       char** word_list,
                       int num_words,
                       int* weights,
-                      int maxjun);
+                      int maxjun,
+                      int VERBOSE);
 
 
 
@@ -159,19 +162,29 @@ int min_scl_over_triangle(scl_problem* scl_prob,
                           triangle* t,
                           mpq_t scl,
                           rvector* new_vertex,
-                          enum scallop_lp_solver solver);
+                          enum scallop_lp_solver solver,
+                          int VERBOSE);
 
 
 int find_undone_triangle(tri_list* T, 
                          double tolerance);
 
-void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert);
+void split_triangles(vert_list* V, 
+                     tri_list* T, 
+                     int split_ind, 
+                     int new_vert,
+                     int VERBOSE);
 
 int find_edge_for_vertex(vert_list* V, triangle* t, int new_vert);
 
-int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_solver solver);
+int one_orthant_step(orthant_problem* orth, 
+                     double tolerance, 
+                     enum scallop_lp_solver solver,
+                     int VERBOSE);
 
-void one_computation_step(ball_problem* ball, enum scallop_lp_solver solver);
+void one_computation_step(ball_problem* ball, 
+                          enum scallop_lp_solver solver, 
+                          int VERBOSE);
 
 void* run_execution(void* E_void);
 
@@ -183,7 +196,8 @@ void orthant_problem_init(orthant_problem* orth,
                           int num_words,
                           mpq_t* predone_scls,
                           int maxjun,
-                          enum scallop_lp_solver solver);
+                          enum scallop_lp_solver solver, 
+                          int VERBOSE);
                           
 void computation_init(execution* E,
                       char*** chains,
@@ -193,7 +207,8 @@ void computation_init(execution* E,
                       double tolerance,
                       int maxjun,
                       enum scallop_lp_solver solver,
-                      GtkWidget* target_drawing_area);
+                      GtkWidget* target_drawing_area,
+                      int VERBOSE);
 
 
 void scl_problem_print(scl_problem* sp);

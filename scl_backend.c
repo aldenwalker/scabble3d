@@ -75,9 +75,9 @@ void linear_program_from_ratmat(polygon* poly_list,
     //the lp by default (set in lpstruct.c)
     //has all the right stuff, I think
     
-    for (i=0; i<constraints->nR; i++) {
-      printf("equality_type[%d] = %d\n", i, equality_type[i]);
-    }
+    //for (i=0; i<constraints->nR; i++) {
+    //  printf("equality_type[%d] = %d\n", i, equality_type[i]);
+    //}
     
     
     //now we input the rows -- it likes to name them
@@ -167,7 +167,7 @@ void linear_program_from_ratmat(polygon* poly_list,
     //  cout << "Vars: " << lp->vars;
     //}
     
-    printf("Rows: %d\nCols: %d\n", lp->rows, lp->vars);
+    //printf("Rows: %d\nCols: %d\n", lp->rows, lp->vars);
     
     result = solve_lp(lp);
     
@@ -534,7 +534,7 @@ void point_scl(scl_problem* scl_prob,
   //get rid of the extra stuff we added
   RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR-3);
   scl_prob->equality_type = (int*)realloc((void*)(scl_prob->equality_type),
-                                          scl_prob->constraints->nR);
+                                          scl_prob->constraints->nR*sizeof(int));
   mpq_clear(temp_mpq);
   for (i=0; i<3; i++) {
     mpq_clear(coef[i]);
@@ -559,7 +559,8 @@ int min_scl_over_triangle(scl_problem* scl_prob,
                           triangle* t,
                           mpq_t scl,
                           rvector* new_vertex,
-                          enum scallop_lp_solver solver) {
+                          enum scallop_lp_solver solver,
+                          int VERBOSE) {
   int i,j,k,l;
   int first_word_index;
   mpq_t temp_mpq;
@@ -570,12 +571,14 @@ int min_scl_over_triangle(scl_problem* scl_prob,
   //we need to add the constraints for both the hyperplane and for the 
   //triangle (3 for the triangle)
   
-  printf("minimizing scl over the triangle with vertices:\n");
-  for (i=0; i<3; i++) {
-    rvector_print(&V->verts[t->verts[i]]);
-    printf(" ");
+  if (VERBOSE) {
+    printf("minimizing scl over the triangle with vertices:\n");
+    for (i=0; i<3; i++) {
+      rvector_print(&V->verts[t->verts[i]]);
+      printf(" ");
+    }
+    printf("\n");
   }
-  printf("\n");
   
   /************* hyperplane **************************************************/
   RatMat_change_num_rows(scl_prob->constraints, scl_prob->constraints->nR+1);
@@ -594,13 +597,16 @@ int min_scl_over_triangle(scl_problem* scl_prob,
   rvector_cross(&normal_vector, &spanning_vector1, &spanning_vector2);
   rvector_dot(normal_value, &normal_vector, &(V->verts[t->verts[0]]));
   
-  printf("spanning vectors:\n");
-  rvector_print(&spanning_vector1);
-  rvector_print(&spanning_vector2);
-  printf("normal_vector:\n");
-  rvector_print(&normal_vector);
-  printf("With hyperplane value: ");
-  mpq_out_str(NULL, 10, normal_value); printf("\n");
+  if (VERBOSE) {
+    printf("spanning vectors:\n");
+    rvector_print(&spanning_vector1);
+    rvector_print(&spanning_vector2);
+    printf("normal_vector:\n");
+    rvector_print(&normal_vector);
+    printf("With hyperplane value: ");
+    mpq_out_str(NULL, 10, normal_value); printf("\n");
+  }
+  
   
   //now go through the polygons and say that the image in the 3d space, dotted
   //with normal_vector, gives normal_value
@@ -654,13 +660,15 @@ int min_scl_over_triangle(scl_problem* scl_prob,
       mpq_swap(parallel_value1, parallel_value2);
     }
     
-    printf("parallel vector %d:\n", i);
-    rvector_print(&parallel_vector);
-    printf("\nwith limits ");
-    mpq_out_str(NULL, 10, parallel_value1);
-    printf(" and ");
-    mpq_out_str(NULL, 10, parallel_value2);
-    printf("\n");
+    if (VERBOSE) {
+      printf("parallel vector %d:\n", i);
+      rvector_print(&parallel_vector);
+      printf("\nwith limits ");
+      mpq_out_str(NULL, 10, parallel_value1);
+      printf(" and ");
+      mpq_out_str(NULL, 10, parallel_value2);
+      printf("\n");
+    }
     
     for (j=0; j<scl_prob->num_polys; j++) {
       mpq_set_si(coef, 0, 1);
@@ -718,7 +726,9 @@ int min_scl_over_triangle(scl_problem* scl_prob,
                              scl_prob->equality_type,
                              solver);
   
-  printf("Got scl: "); mpq_out_str(NULL, 10, scl); printf("\n");
+  if (VERBOSE) {
+    printf("Got scl: "); mpq_out_str(NULL, 10, scl); printf("\n");
+  }
   
   /***************** read solution vector ************************************/
   for (i=0; i<3; i++) {
@@ -832,7 +842,7 @@ int find_edge_for_vertex(vert_list* V, triangle* t, int new_vert) {
 /* we might be splitting an edge, in which case we need to look to find the  */
 /* matching edge and split that too                                          */
 /*****************************************************************************/
-void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
+void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert, int VERBOSE) {
   int j,k;
   int vert_in_edge;
   int edge_vert1, edge_vert2;
@@ -843,10 +853,13 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
   //find out where the new vertex is in the triangle
   vert_in_edge = find_edge_for_vertex(V, &(T->tris[split_ind]), new_vert);
   
-  printf("I'm splitting the triangle [%d,%d,%d]-- looks like the new vert is in edge %d\n", T->tris[split_ind].verts[0],
-                                                                                            T->tris[split_ind].verts[1],
-                                                                                            T->tris[split_ind].verts[2],
-                                                                                            vert_in_edge);
+  if (VERBOSE) {
+    printf("I'm splitting the triangle [%d,%d,%d]-- looks like the new vert is in edge %d\n", 
+           T->tris[split_ind].verts[0],
+          T->tris[split_ind].verts[1],
+          T->tris[split_ind].verts[2],
+          vert_in_edge);
+  }
   
   if (vert_in_edge == 3) {  //it's in the interior
     //if the triangle is 0 1 2, and the new vertex is x, then
@@ -856,9 +869,11 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
       temp_tri.verts[1] = T->tris[split_ind].verts[(j+1)%3];
       temp_tri.verts[2] = new_vert;
       temp_tri.area = triangle_area(V, &temp_tri);
-      printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
-                                                     temp_tri.verts[1],
-                                                     temp_tri.verts[2]);
+      if (VERBOSE) {
+        printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                       temp_tri.verts[1],
+                                                       temp_tri.verts[2]);
+      }
       tri_list_add_copy(T, &temp_tri);
     }
     //get rid of the triangle that we split
@@ -872,20 +887,24 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
     temp_tri.verts[1] = T->tris[split_ind].verts[(vert_in_edge+2)%3];
     temp_tri.verts[2] = new_vert;
     temp_tri.area = triangle_area(V, &temp_tri);
-    printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
-                                                   temp_tri.verts[1],
-                                                   temp_tri.verts[2]);
+    if (VERBOSE) {
+      printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                     temp_tri.verts[1],
+                                                     temp_tri.verts[2]);
+    }
     tri_list_add_copy(T, &temp_tri);
     temp_tri.verts[0] = T->tris[split_ind].verts[(vert_in_edge+2)%3];
     temp_tri.verts[1] = T->tris[split_ind].verts[vert_in_edge];
     temp_tri.verts[2] = new_vert;
     temp_tri.area = triangle_area(V, &temp_tri);
-    printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
-                                                   temp_tri.verts[1],
-                                                   temp_tri.verts[2]);
+    if (VERBOSE) {
+      printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                     temp_tri.verts[1],
+                                                     temp_tri.verts[2]);
+    }
     tri_list_add_copy(T, &temp_tri);
     
-    printf("Added two triangles == current length is %d\n", T->num_tris);
+    if (VERBOSE) printf("Added two triangles == current length is %d\n", T->num_tris);
     
     //now there's another triangle somewhere which has to be split as well
     edge_vert1 = T->tris[split_ind].verts[vert_in_edge];
@@ -894,24 +913,30 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
       for (k=0; k<3; k++) {
         if (   T->tris[j].verts[k] == edge_vert2 
             && T->tris[j].verts[(k+1)%3] == edge_vert1) {
-          printf("looks like I found the other triangle -- edge %d in triangle %d - [%d,%d,%d]\n", k, j, T->tris[j].verts[0],
-                                                                                                         T->tris[j].verts[1],
-                                                                                                         T->tris[j].verts[2]);
+          if (VERBOSE) {
+            printf("looks like I found the other triangle -- edge %d in triangle %d - [%d,%d,%d]\n", k, j, T->tris[j].verts[0],
+                                                                                                           T->tris[j].verts[1],
+                                                                                                           T->tris[j].verts[2]);
+          }
           temp_tri.verts[0] = T->tris[j].verts[(k+1)%3];
           temp_tri.verts[1] = T->tris[j].verts[(k+2)%3];
           temp_tri.verts[2] = new_vert;
           temp_tri.area = triangle_area(V, &temp_tri);
-          printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
-                                                         temp_tri.verts[1],
-                                                         temp_tri.verts[2]);
+          if (VERBOSE) {
+            printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                           temp_tri.verts[1],
+                                                           temp_tri.verts[2]);
+          }
           tri_list_add_copy(T, &temp_tri);
           temp_tri.verts[0] = T->tris[j].verts[(k+2)%3];
           temp_tri.verts[1] = T->tris[j].verts[k];
           temp_tri.verts[2] = new_vert;
           temp_tri.area = triangle_area(V, &temp_tri);
-          printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
-                                                         temp_tri.verts[1],
-                                                         temp_tri.verts[2]);
+          if (VERBOSE) {
+            printf("I'm adding the triangle [%d,%d,%d]\n", temp_tri.verts[0],
+                                                           temp_tri.verts[1],
+                                                           temp_tri.verts[2]);
+          }
           tri_list_add_copy(T, &temp_tri);
           break;
         }
@@ -944,18 +969,21 @@ void split_triangles(vert_list* V, tri_list* T, int split_ind, int new_vert) {
 /* do one orthant step                                                      */
 /* returns 1 if this orthant is complete (up to the current tolerance)      */
 /****************************************************************************/
-int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_solver solver) {
+int one_orthant_step(orthant_problem* orth, 
+                     double tolerance, 
+                     enum scallop_lp_solver solver,
+                     int VERBOSE) {
   int i;
   int its_linear;
   triangle temp_tri;
   mpq_t min_scl;
   rvector temp_vert;
   
-  printf("*Doing one orthant step\n");
-  
-  printf("Current triangle list:\n");
-  tri_list_print(orth->triangles, orth->vertices);
-    
+  if (VERBOSE) {
+    printf("*Doing one orthant step\n");
+    printf("Current triangle list:\n");
+    tri_list_print(orth->triangles, orth->vertices);
+  }
   
   
   //find the next undone triangle
@@ -964,7 +992,7 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
     return 1;
   }
   
-  printf("I found that triangle %d was undone\n", i);
+  if (VERBOSE) printf("I found that triangle %d was undone\n", i);
   
   //so this triangle can be worked
   rvector_init(&temp_vert, 3);
@@ -975,14 +1003,17 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
                                      &(orth->triangles->tris[i]),
                                      min_scl,
                                      &temp_vert,
-                                     solver);
-  printf("min_scl: ");
-  mpq_out_str(NULL, 10, min_scl);
-  printf("\n");
-  printf("its_linear: %d\n", its_linear);
+                                     solver,
+                                     VERBOSE);
+  if (VERBOSE) {
+    printf("min_scl: ");
+    mpq_out_str(NULL, 10, min_scl);
+    printf("\n");
+    printf("its_linear: %d\n", its_linear);
+  }
   
   if (its_linear == 1) {
-    printf("It's linear -- moving the triangle up\n");
+    if (VERBOSE) printf("It's linear -- moving the triangle up\n");
     //move the triangle into the correct position near the top
     orth->triangles->tris[i].is_scl_linear = 1;
     temp_tri = orth->triangles->tris[orth->triangles->first_nonlinear_triangle];
@@ -1001,9 +1032,11 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
   //  mpq_div(temp_vert.coord[j], temp_vert.coord[j], min_scl);
   //}
   
-  printf("It's not linear; adding vertex ");
-  rvector_print(&temp_vert);
-  printf("\n");
+  if (VERBOSE) {
+    printf("It's not linear; adding vertex ");
+    rvector_print(&temp_vert);
+    printf("\n");
+  }
   
   //add it to the vertex list
   vert_list_add_copy(orth->vertices, &temp_vert);
@@ -1012,15 +1045,18 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
   split_triangles(orth->vertices,
                   orth->triangles,
                   i,
-                  orth->vertices->num_verts - 1);
+                  orth->vertices->num_verts - 1,
+                  VERBOSE);
   
-  printf("I split the triangle\n");
-  printf("triangles:\n");
-  tri_list_print(orth->triangles, orth->vertices);
+  if (VERBOSE) {
+    printf("I split the triangle\n");
+    printf("triangles:\n");
+    tri_list_print(orth->triangles, orth->vertices);
+  }
   
   i = find_undone_triangle(orth->triangles, tolerance);
   
-  printf("The next undone triangle is: %d\n", i);
+  if (VERBOSE) printf("The next undone triangle is: %d\n", i);
   
   if (i!=-1) {
     orth->max_undone_triangle_area = orth->triangles->tris[i].area;
@@ -1042,17 +1078,22 @@ int one_orthant_step(orthant_problem* orth, double tolerance, enum scallop_lp_so
 /* just sets current_working_orthant to be correct, and exits                */
 /* if there really is nothing to do, it sets is_complete to 1 and exits      */
 /*****************************************************************************/
-void one_computation_step(ball_problem* ball, enum scallop_lp_solver solver) {
+void one_computation_step(ball_problem* ball, 
+                          enum scallop_lp_solver solver, 
+                          int VERBOSE) {
   int cur_orth = ball->current_working_orthant;
   int i;
   
-  printf("Making one orthant step; cur_oth = %d\n", cur_orth);
-  printf("(which is orthant at %lx\n", (long int)ball->orthants[cur_orth]);
-  printf("with tolerance %f\n", ball->tolerance);
+  if (VERBOSE) {
+    printf("Making one orthant step; cur_oth = %d\n", cur_orth);
+    printf("(which is orthant at %lx\n", (long int)ball->orthants[cur_orth]);
+    printf("with tolerance %f\n", ball->tolerance);
+  }
   
   if (1 == one_orthant_step(ball->orthants[cur_orth], 
                             ball->tolerance, 
-                            solver)) {  //if 1, we are done
+                            solver,
+                            VERBOSE)) {  //if 1, we are done
     //try to find something to do
     for (i=1; i<4; i++) {
       if (0 <= find_undone_triangle(ball->orthants[(cur_orth+i)%4]->triangles, 
@@ -1083,16 +1124,17 @@ void* run_execution(void* E_void) {
   
   execution* E = (execution*)E_void;
   
-  printf("*started main execution\n");
-  execution_print(E);
-  
-  printf("*About to wait for semaphore at %lx\n", (long int)&(E->message_sem));
+  if (E->VERBOSE) {
+    printf("*started main execution\n");
+    execution_print(E); 
+    printf("*About to wait for semaphore at %lx\n", (long int)&(E->message_sem));
+  }
   //set the status to running
   sem_wait(&(E->message_sem));
   E->status = 1;
   E->status_message = (E->one_step == 1 ? 1 : 0);
   sem_post(&(E->message_sem));
-  printf("*Done\n");
+  if (E->VERBOSE) printf("*Done\n");
   
   sem_wait(&(E->running_sem));
   
@@ -1102,22 +1144,21 @@ void* run_execution(void* E_void) {
   //enter the main loop:
   while (1) {
     //compute the next triangle
-    one_computation_step(E->ball, E->solver);
+    one_computation_step(E->ball, E->solver, E->VERBOSE);
     
-    printf("*done computation step\n");
+    if (E->VERBOSE) printf("*done computation step\n");
     
     //tell the GUI about the new triangles
     sem_wait(&(E->read_data_sem));
     g_idle_add( (GSourceFunc)update_ball_picture_while_running, E );
-    printf("*g_idle_added display function\n");
+    if (E->VERBOSE) printf("*g_idle_added display function\n");
     sem_wait(&(E->read_data_sem));  //wait until the gui is done
     sem_post(&(E->read_data_sem));
     
     sem_getvalue(&(E->message_sem), &value);
-    printf("E->message_sem: %d\n", value);
     
     //check for a new tolerance
-    printf("checking for new tolerance\n");
+    if (E->VERBOSE) printf("checking for new tolerance\n");
     sem_wait(&(E->message_sem));
     if (E->new_tolerance_check == 1) {
       E->ball->tolerance = E->new_tolerance;
@@ -1126,7 +1167,7 @@ void* run_execution(void* E_void) {
     sem_post(&(E->message_sem));
     
     //check to see if we should skip the current orthant
-    printf("checking for skip_orthant\n");
+    if (E->VERBOSE) printf("checking for skip_orthant\n");
     sem_wait(&(E->message_sem));
     if (E->skip_orthant == 1) {
       E->ball->current_working_orthant = (E->ball->current_working_orthant + 1)%4;
@@ -1135,7 +1176,7 @@ void* run_execution(void* E_void) {
     sem_post(&(E->message_sem));
     
     //check to see if we should stop
-    printf("Checking if we should stop\n");
+    if (E->VERBOSE) printf("Checking if we should stop\n");
     sem_wait(&(E->message_sem));
     if (E->status_message == 1) {
       E->status = 0;
@@ -1146,7 +1187,7 @@ void* run_execution(void* E_void) {
     sem_post(&(E->message_sem));
     
     //check to see if actually, we're just done (up to tolerance)
-    printf("checking if we're done\n");
+    if (E->VERBOSE) printf("checking if we're done\n");
     if (E->ball->is_complete == 1) {
       sem_wait(&(E->message_sem));
       E->status = 0;
@@ -1171,7 +1212,8 @@ void scl_problem_init(scl_problem* scl_prob,
                       char** word_list,
                       int num_words,
                       int* weights,
-                      int maxjun) {
+                      int maxjun, 
+                      int VERBOSE) {
   int i,j;
   scl_prob->arc_list = NULL;
   scl_prob->poly_list = NULL;
@@ -1191,12 +1233,14 @@ void scl_problem_init(scl_problem* scl_prob,
     }
   }
   
-  printf("Chains:\n");
-  for (i=0; i<3; i++) {
-    for (j=0; j<scl_prob->chain_lens[i]; j++) {
-      printf("%s ", scl_prob->chains[i][j]);
+  if (VERBOSE) {
+    printf("Chains:\n");
+    for (i=0; i<3; i++) {
+      for (j=0; j<scl_prob->chain_lens[i]; j++) {
+        printf("%s ", scl_prob->chains[i][j]);
+      }
+      printf("\n");
     }
-    printf("\n");
   }
     
   scl_prob->word_list = (char**)malloc(num_words*sizeof(char*));
@@ -1208,36 +1252,41 @@ void scl_problem_init(scl_problem* scl_prob,
     scl_prob->weights[i] = weights[i];
   }
   
-  printf("Word list:\n");
-  for (i=0; i<scl_prob->num_words; i++) {
-    printf("%d%s ", scl_prob->weights[i], scl_prob->word_list[i]);
+  if (VERBOSE) {
+    printf("Word list:\n");
+    for (i=0; i<scl_prob->num_words; i++) {
+      printf("%d%s ", scl_prob->weights[i], scl_prob->word_list[i]);
+    }
+    printf("\n");
   }
-  printf("\n");
   
   
   generate_arcs(&(scl_prob->arc_list), &(scl_prob->num_arcs), 
                 scl_prob->word_list, scl_prob->num_words);
   
-  printf("Generated %d arcs:\n", scl_prob->num_arcs);
-  //for (i=0; i<scl_prob->num_arcs; i++) {
-  //  printf("%d %d %d %d\n", scl_prob->arc_list[i].first_word,
-  //                          scl_prob->arc_list[i].first,
-  //                          scl_prob->arc_list[i].last_word,
-  //                          scl_prob->arc_list[i].last);
-  //}
+  if (VERBOSE) {
+    printf("Generated %d arcs:\n", scl_prob->num_arcs);
+    //for (i=0; i<scl_prob->num_arcs; i++) {
+    //  printf("%d %d %d %d\n", scl_prob->arc_list[i].first_word,
+    //                          scl_prob->arc_list[i].first,
+    //                          scl_prob->arc_list[i].last_word,
+    //                          scl_prob->arc_list[i].last);
+    //}
+  }
   
   generate_polygons(scl_prob->word_list, scl_prob->num_words,
                     scl_prob->arc_list, scl_prob->num_arcs,
                     &(scl_prob->poly_list), &(scl_prob->num_polys),
                     maxjun);
-                    
-  printf("Generated %d polygons:\n", scl_prob->num_polys);
-  //for (i=0; i<scl_prob->num_polys; i++) {
-  //  for (j=0; j<scl_prob->poly_list[i].num_arcs; j++) {
-  //    printf("%d ", scl_prob->poly_list[i].arc[j]);
-  //  }
-  //  printf("\n");
-  //}
+  if (VERBOSE) {                  
+    printf("Generated %d polygons:\n", scl_prob->num_polys);
+    //for (i=0; i<scl_prob->num_polys; i++) {
+    //  for (j=0; j<scl_prob->poly_list[i].num_arcs; j++) {
+    //    printf("%d ", scl_prob->poly_list[i].arc[j]);
+    //  }
+    //  printf("\n");
+    //}
+  }
   
   //printf("scl_prob->equality_type: %x\n", scl_prob->equality_type);
     
@@ -1264,7 +1313,8 @@ void orthant_problem_init(orthant_problem* orth,
                           int num_words,
                           mpq_t* predone_scls,
                           int maxjun,
-                          enum scallop_lp_solver solver) {
+                          enum scallop_lp_solver solver,
+                          int VERBOSE) {
   int i,j;
   char*** these_chains = (char***)malloc(3*sizeof(char**));
   char** all_words = NULL;
@@ -1288,19 +1338,21 @@ void orthant_problem_init(orthant_problem* orth,
     }
   }
   
-  printf("Initializing orthant: %d\n", index);
-  printf("with chains:\n");
-  for (i=0; i<3; i++) {
-    for (j=0; j<chain_lens[i]; j++) {
-      printf("%s ", these_chains[i][j]);
+  if (VERBOSE) {
+    printf("Initializing orthant: %d\n", index);
+    printf("with chains:\n");
+    for (i=0; i<3; i++) {
+      for (j=0; j<chain_lens[i]; j++) {
+        printf("%s ", these_chains[i][j]);
+      }
+      printf("\n");
+    }
+    printf("And word list:\n");
+    for (i=0; i<num_words; i++) {
+      printf("%d%s ", weights[i], all_words[i]);
     }
     printf("\n");
   }
-  printf("And word list:\n");
-  for (i=0; i<num_words; i++) {
-    printf("%d%s ", weights[i], all_words[i]);
-  }
-  printf("\n");
   
   orth->scl_prob = (scl_problem*)malloc(sizeof(scl_problem));
   
@@ -1311,7 +1363,8 @@ void orthant_problem_init(orthant_problem* orth,
                    all_words, 
                    num_words, 
                    weights, 
-                   maxjun);
+                   maxjun,
+                   VERBOSE);
  
   orth->orthant_num = index;
   orth->is_complete = 0;
@@ -1348,14 +1401,16 @@ void orthant_problem_init(orthant_problem* orth,
     for (j=0; j<3; j++) {
       mpq_div(point.coord[j], point.coord[j], scl);
     }
-    printf("Got vertex: "); rvector_print(&point); printf("\n");
+    if (VERBOSE){printf("Got vertex: "); rvector_print(&point); printf("\n");}
     vert_list_add_copy(orth->vertices, &point);
     
   }
   
-  printf("Got initial vertices (%d):\n", orth->vertices->num_verts);
-  for (i=0; i<3; i++) {
-    rvector_print(&(orth->vertices->verts[i])); printf("\n");
+  if (VERBOSE) {
+    printf("Got initial vertices (%d):\n", orth->vertices->num_verts);
+    for (i=0; i<3; i++) {
+      rvector_print(&(orth->vertices->verts[i])); printf("\n");
+    }
   }
   
   orth->triangles->tris[0].area = triangle_area(orth->vertices, orth->triangles->tris);
@@ -1391,12 +1446,14 @@ void computation_init(execution* E,
                       double tolerance,
                       int maxjun,
                       enum scallop_lp_solver solver,
-                      GtkWidget* target_drawing_area) {
+                      GtkWidget* target_drawing_area,
+                      int VERBOSE) {
   int i,j;
   
   mpq_t predone_scls[3];
   
-  printf("Initializing execution\n");
+  if (VERBOSE)
+    printf("Initializing execution\n");
   
   //set up the execution structure
   E->status = 0;
@@ -1406,6 +1463,7 @@ void computation_init(execution* E,
   E->skip_orthant = 0;
   E->solver = solver;
   E->maxjun = maxjun;
+  E->VERBOSE = VERBOSE;
   E->ball = (ball_problem*)malloc(sizeof(ball_problem));
   E->ball->tolerance = tolerance;
   E->ball->num_chains = 3;
@@ -1427,7 +1485,16 @@ void computation_init(execution* E,
   E->ball->orthants = (orthant_problem**)malloc(4*sizeof(orthant_problem*));
   for (i=0; i<4; i++) {
     E->ball->orthants[i] = (orthant_problem*)malloc(sizeof(orthant_problem));
-    orthant_problem_init(E->ball->orthants[i], i, chains, chain_lens, weights, num_words, predone_scls, maxjun, solver);
+    orthant_problem_init(E->ball->orthants[i], 
+                         i, 
+                         chains, 
+                         chain_lens, 
+                         weights, 
+                         num_words, 
+                         predone_scls, 
+                         maxjun, 
+                         solver,
+                         VERBOSE);
   }
   E->ball->current_working_orthant = 0;
   

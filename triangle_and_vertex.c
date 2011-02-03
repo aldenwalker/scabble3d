@@ -77,7 +77,7 @@ void tri_list_add_copy(tri_list* T, triangle* t) {
 
 void tri_list_delete_index(tri_list* T, int index) {
   int i;
-  printf("I'm deleting the triangle at position %d\n", index);
+  //printf("I'm deleting the triangle at position %d\n", index);
   free(T->tris[index].verts);
   for (i = index; i<T->num_tris-1; i++) {
     T->tris[i] = T->tris[i+1];
@@ -223,7 +223,7 @@ void rvector_print(rvector* v) {
 /*****************************************************************************/
 void vert_list_add_copy(vert_list* V, rvector* v) {
   int i;
-  printf("I'm adding a vertex\n");
+  //printf("I'm adding a vertex\n");
   V->num_verts ++;
   V->verts = (rvector*)realloc((void*)(V->verts), (V->num_verts)*sizeof(rvector));
   rvector_init(&(V->verts[V->num_verts-1]), v->dim);

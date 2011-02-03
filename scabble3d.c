@@ -29,6 +29,9 @@ typedef struct {
   GtkWidget* drawing;
 } fieldList;
 
+/*****************************************************************************/
+/* this gives our current status in terms of rotation, etc                   */
+/*****************************************************************************/
 struct {
   double button1_down_x;
   double button1_down_y;
@@ -49,9 +52,15 @@ ball_mesh* GLmesh = NULL;
 //this is the global execution going on 
 execution* EGlobal = NULL;
 
+//I've got so many globals, I might as well throw in verbose too, for
+//simplicity
+int VERBOSE = 0;
+
 
 /*****************************************************************************/
 /* this function draws the opengl scene                                      */
+/* note that the GLmesh holds some triangles and normals which must be       */
+/* flipped in orientation                                                    */
 /*****************************************************************************/
 void draw_mesh() {
   int i,j,k,orth;
@@ -193,7 +202,8 @@ void update_ball_picture_while_running(execution* E) {
   double diff2[3];
   double normal[3];
   
-  printf("Hey I'm drawing the ball now\n");
+  if (VERBOSE) 
+    printf("Hey I'm drawing the ball now\n");
   
    
   tri_list* T = NULL;
@@ -317,10 +327,12 @@ void load_inputs_and_run(char* arg1,
     }
   }
   
-  printf("Called with: %s, %s, %s,\n", arg1, arg2, arg3);
-  printf(" = %s, %s, %s, \n", args[0], args[1], args[2]);
-  printf("I found chain lens: %d, %d, %d\n", chain_lens[0], chain_lens[1], chain_lens[2]);
-  printf("For a total of %d words\n", num_words);
+  if (VERBOSE) {
+    printf("Called with: %s, %s, %s,\n", arg1, arg2, arg3);
+    printf(" = %s, %s, %s, \n", args[0], args[1], args[2]);
+    printf("I found chain lens: %d, %d, %d\n", chain_lens[0], chain_lens[1], chain_lens[2]);
+    printf("For a total of %d words\n", num_words);
+  }
   
   weights = (int*)malloc(num_words*sizeof(int));
   current_total_word = 0;
@@ -353,12 +365,14 @@ void load_inputs_and_run(char* arg1,
     }
   }
   
-  printf("I got the following chains:\n");
-  for (i=0; i<3; i++) {
-    for (j=0; j<chain_lens[i]; j++) {
-      printf("%s ", chains[i][j]);
+  if (VERBOSE) {
+    printf("I got the following chains:\n");
+    for (i=0; i<3; i++) {
+      for (j=0; j<chain_lens[i]; j++) {
+        printf("%s ", chains[i][j]);
+      }
+      printf("\n");
     }
-    printf("\n");
   }
   
   execution* E = (execution*)malloc(sizeof(execution));
@@ -371,7 +385,8 @@ void load_inputs_and_run(char* arg1,
                       tolerance, 
                       maxjun, 
                       solver,
-                      target_drawing_area);
+                      target_drawing_area,
+                      VERBOSE);
   
   if (EGlobal != NULL) {
     execution_free(EGlobal);
@@ -385,7 +400,7 @@ void load_inputs_and_run(char* arg1,
     strcpy(EGlobal->initial_arguments[i], args[i]);
   }
   
-  execution_print(E);
+  //execution_print(E);
   
   //initialize the GLmesh
   GLmesh = (ball_mesh*)malloc(sizeof(ball_mesh));
@@ -403,15 +418,18 @@ void load_inputs_and_run(char* arg1,
     
   sem_wait(&(E->read_data_sem));
   update_ball_picture_while_running(E);
-  printf("Drew the initial ball\n");
-    
-  printf("Done computation init -- about to start pthread\n"); 
+  
+  if (VERBOSE) {
+    printf("Drew the initial ball\n");  
+    printf("Done computation init -- about to start pthread\n"); 
+  }
     
   //start the multi-threadedness
   pthread_t worker_thread;
   pthread_create(&worker_thread, NULL, run_execution, (void*)E);
   
-  printf("started computation thread\n");
+  if (VERBOSE) 
+    printf("started computation thread\n");
   
 }
   
@@ -426,62 +444,79 @@ static gboolean run_button_press(GtkWidget* widget,
   char* e2;
   char* e3;
   
-  if (event->type == GDK_BUTTON_RELEASE) {
-    
-    //if something is running currently, don't do anything
-    if (EGlobal != NULL) {
-      sem_wait(&EGlobal->message_sem);
-      if (EGlobal->status == 1) {
-        sem_post(&EGlobal->message_sem);
-        return TRUE;
-      }
-      sem_post(&EGlobal->message_sem);
-    }
-    
-    e1 = (char*)gtk_entry_get_text(fields->entry1);
-    e2 = (char*)gtk_entry_get_text(fields->entry2);
-    e3 = (char*)gtk_entry_get_text(fields->entry3);
-    
-    if (EGlobal == NULL || 
-         (strcmp(EGlobal->initial_arguments[0], e1)!=0
-          || strcmp(EGlobal->initial_arguments[1], e2)!=0
-          || strcmp(EGlobal->initial_arguments[2], e3)!=0
-          || (EGlobal->maxjun == 5 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)))
-          || (EGlobal->maxjun == 4 && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check))) ) ) {
-    
-       if (strlen(e1) == 0
-          || strlen(e2) == 0
-          || strlen(e3) == 0) {
-        printf("You forgot a chain or something\n");
-        return TRUE;
-      }
-      printf("Looks like you want to start a new computation\n"); fflush(stdout);
-      double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
-      load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
-                          (char*)gtk_entry_get_text(fields->entry2),
-                          (char*)gtk_entry_get_text(fields->entry3),
-                          tolerance,
-                          (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)) ? 5 : 4),
-                          EXLP,
-                          fields->drawing);
-                          
+  //if we're just pressing, don't do anything
+  if (event->type == GDK_BUTTON_PRESS) {
+    return FALSE;
+  }
   
-    } else { //we already have an execution -- run it
-      //make the tolerance whatever is in the box
-      EGlobal->ball->tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+    
+  //if something is running currently, don't do anything
+  if (EGlobal != NULL) {
+    sem_wait(&EGlobal->message_sem);
+    if (EGlobal->status == 1) {
+      sem_post(&EGlobal->message_sem);
+      return TRUE;
+    }
+    sem_post(&EGlobal->message_sem);
+  }
+  
+  //load the fields from the entries
+  e1 = (char*)gtk_entry_get_text(fields->entry1);
+  e2 = (char*)gtk_entry_get_text(fields->entry2);
+  e3 = (char*)gtk_entry_get_text(fields->entry3);
+  
+  //check if either: we don't have any execution, or we've changed the inputs
+  //so we have to re-init
+  if (EGlobal == NULL || 
+       (strcmp(EGlobal->initial_arguments[0], e1)!=0
+        || strcmp(EGlobal->initial_arguments[1], e2)!=0
+        || strcmp(EGlobal->initial_arguments[2], e3)!=0
+        || (EGlobal->maxjun == 5 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)))
+        || (EGlobal->maxjun == 4 && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check))) ) ) {
+  
+     if (strlen(e1) == 0
+        || strlen(e2) == 0
+        || strlen(e3) == 0) {
+      printf("You forgot a chain or something\n");
+      return TRUE;
+    }
+    if (VERBOSE) {
+      printf("Looks like you want to start a new computation\n"); fflush(stdout);
+    }
+    double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+    load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
+                        (char*)gtk_entry_get_text(fields->entry2),
+                        (char*)gtk_entry_get_text(fields->entry3),
+                        tolerance,
+                        (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)) ? 5 : 4),
+                        EXLP,
+                        fields->drawing);
+                        
+
+  } else { 
+    //we already have an execution -- run it
+    //make the tolerance whatever is in the box
+    EGlobal->ball->tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+    
+    if (VERBOSE) {
       printf("Loading new tolerance %f\n", EGlobal->ball->tolerance);
       printf("from field with text %s\n", (char*)gtk_entry_get_text(fields->tol_entry));
-      pthread_t worker_thread;
-      EGlobal->one_step = 0;
-      EGlobal->status_message = 0;
-      pthread_create(&worker_thread, NULL, run_execution, (void*)EGlobal);
-    
-      printf("started computation thread\n");  
     }
+    pthread_t worker_thread;
+    EGlobal->one_step = 0;
+    EGlobal->status_message = 0;
+    pthread_create(&worker_thread, NULL, run_execution, (void*)EGlobal);
+    
+    if (VERBOSE) 
+      printf("started computation thread\n");  
   }
+ 
   return FALSE;
 }       
 
+/*****************************************************************************/
+/* pause a currently-running execution                                       */
+/*****************************************************************************/
 static gboolean pause_button_press(GtkWidget* widget,
                                    GdkEventButton* event,
                                    fieldList* fields) {
@@ -493,6 +528,9 @@ static gboolean pause_button_press(GtkWidget* widget,
   return FALSE;
 }
 
+/*****************************************************************************/
+/* do a single execution step  (one linear program)                          */
+/*****************************************************************************/
 static gboolean step_button_press(GtkWidget* widget,
                                   GdkEventButton* event,
                                   fieldList* fields) {
@@ -510,6 +548,9 @@ static gboolean step_button_press(GtkWidget* widget,
   return FALSE;
 }
     
+/*****************************************************************************/
+/* save the current ball as a pov file                                       */
+/*****************************************************************************/    
 static gboolean save_pov_button_press(GtkWidget* widget,
                                       GdkEventButton* event,
                                       fieldList* fields) {  
@@ -520,6 +561,7 @@ static gboolean save_pov_button_press(GtkWidget* widget,
     return FALSE;
   } 
   
+  //if we're running, don't mess with it
   sem_wait(&EGlobal->message_sem);
   if (EGlobal->status == 1) {
     sem_post(&EGlobal->message_sem);
@@ -586,13 +628,18 @@ static gboolean save_pov_button_press(GtkWidget* widget,
   return FALSE;
 }
 
+/*****************************************************************************/
+/* save the ball as an eps file (not currently working)                      */
+/*****************************************************************************/
 static gboolean save_eps_button_press(GtkWidget* widget,
                                       GdkEventButton* event,
                                       fieldList* fields) {  
   return FALSE;
 }
     
-
+/*****************************************************************************/
+/* this is called whenever we move the move (so we can rotate)               */
+/*****************************************************************************/
 static gboolean drawing_motion_notify(GtkWidget* area,
                                       GdkEventMotion* event,
                                       fieldList* fields) {
@@ -615,8 +662,6 @@ static gboolean drawing_motion_notify(GtkWidget* area,
     (GDK_BUTTON1_MASK || GDK_BUTTON3_MASK)) {
     if (GDK_BUTTON1_MASK) {
       dstatus.current_rotation_x = (event->x - dstatus.button1_down_x)/10;
-    //}
-    //if (GDK_BUTTON3_MASK) {
       dstatus.current_rotation_y = (area->allocation.height - event->y - dstatus.button1_down_y)/10;
     }
     draw_mesh();
@@ -627,7 +672,9 @@ static gboolean drawing_motion_notify(GtkWidget* area,
   return FALSE;
 }
     
-    
+/*****************************************************************************/
+/* called whenever we click on the drawing area                              */
+/*****************************************************************************/    
 static gboolean drawing_mouse_click(GtkWidget* area,
                                     GdkEventButton* event,
                                     fieldList* fields) {
@@ -646,7 +693,7 @@ static gboolean drawing_mouse_click(GtkWidget* area,
       dstatus.current_rotation_y = (area->allocation.height - event->y - dstatus.button1_down_y)/10;
       dstatus.constant_rotation_y += dstatus.current_rotation_y;
       dstatus.current_rotation_y = 0;
-      printf("Current rotations: %f, %f\n", dstatus.constant_rotation_x, dstatus.constant_rotation_y);
+      //printf("Current rotations: %f, %f\n", dstatus.constant_rotation_x, dstatus.constant_rotation_y);
       draw_mesh();
       gdk_window_invalidate_rect(area->window, &area->allocation, FALSE);
 	    gdk_window_process_updates(area->window, FALSE);
@@ -656,7 +703,9 @@ static gboolean drawing_mouse_click(GtkWidget* area,
   return TRUE;
 }
 
-
+/*****************************************************************************/
+/* this gets called whenever an area of the window is invalidated            */
+/*****************************************************************************/
 static gboolean expose(GtkWidget* area, GdkEventExpose* event, gpointer data) {
   gdk_draw_drawable(area->window,
                     area->style->fg_gc[gtk_widget_get_state (area)],
@@ -667,6 +716,9 @@ static gboolean expose(GtkWidget* area, GdkEventExpose* event, gpointer data) {
   return FALSE;
 }
 
+/*****************************************************************************/
+/* called once when gtk starts up                                            */
+/*****************************************************************************/
 static gboolean configure(GtkWidget* area, 
                           GdkEventConfigure* event,
                           gpointer data) {
@@ -773,7 +825,8 @@ static gboolean configure(GtkWidget* area,
 	}
 	gdk_gl_drawable_gl_end(gldrawable);
 	
-	printf("Configured opengl\n");
+	if (VERBOSE)
+	  printf("Configured opengl\n");
 	
 	dstatus.current_rotation_x = 0;
 	dstatus.current_rotation_y = 0;
@@ -785,7 +838,9 @@ static gboolean configure(GtkWidget* area,
 }
   
   
-  
+/*****************************************************************************/
+/* this makes the X button in the upper right work                           */
+/*****************************************************************************/  
 static gboolean delete_event(GtkWidget* widget, GdkEvent* event, gpointer data) {
   return FALSE;
 }
@@ -829,7 +884,15 @@ int main(int argc, char* argv[]) {
   gtk_init(&argc, &argv);
     
   gdk_gl_init(&argc, &argv);  //gtkglext
-    
+  
+  //check if we're getting the -v option for verbosity
+  if (argc>1) {
+    if (strcmp(argv[1], "-v")==0) {
+      VERBOSE = 1;
+      printf("Looks like you want verbose output\n");
+    }
+  }
+   
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   
   //make the main drawing area
