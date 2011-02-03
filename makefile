@@ -1,12 +1,12 @@
 CCC=g++
 CC=gcc
-CFLAGS= -g -Wall
+CFLAGS=-O3 #-g -Wall
 IFLAGS=-I/sw/include
-LDFLAGS=-L/sw/lib -lglpk -lgmp -lpthread
+LDFLAGS=-L/sw/lib -lgmp -lpthread
 all: scabble3d
 
 scabble3d.o: scabble3d.c *.h
-	$(CC) $(CFLAGS) $(IFLAGS) -c scabble3d.c `pkg-config --cflags --libs gtk+-2.0 gtkglext-1.0 gtkglext-x11-1.0`
+	$(CC) $(CFLAGS) $(IFLAGS) -c scabble3d.c `pkg-config --cflags gtk+-2.0 gtkglext-1.0 gtkglext-x11-1.0`
 	
 word.o: word.c word.h
 	$(CC) $(CFLAGS) $(IFLAGS) -c word.c 
@@ -15,7 +15,7 @@ matrix.o: matrix.c matrix.h
 	$(CC) $(CFLAGS) $(IFLAGS) -c matrix.c 
 
 scl_backend.o: scl_backend.c *.h
-	$(CC) $(CFLAGS) $(IFLAGS) -c scl_backend.c `pkg-config --cflags --libs gtk+-2.0 gtkglext-1.0 gtkglext-x11-1.0`
+	$(CC) $(CFLAGS) $(IFLAGS) -c scl_backend.c `pkg-config --cflags gtk+-2.0 gtkglext-1.0 gtkglext-x11-1.0`
 
 triangle_and_vertex.o: triangle_and_vertex.c triangle_and_vertex.h
 	$(CC) $(CFLAGS) $(IFLAGS) -c triangle_and_vertex.c

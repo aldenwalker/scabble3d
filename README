@@ -16,30 +16,52 @@
 
 
 
-3D scabble readme
+Current version: 1.0 -- February 3, 2011
+
+-----
+Theory:
+-----
+See Chapter 4 of:
+
+Danny Calegari, scl, MSJ Memoirs 20. Mathematical Society of Japan, Tokyo, 2009
 
 
+-----
+Installation:
+-----
+Just type "make".  You will need gmp, gtk, gtkglext, and opengl.  If you're using
+linux or fink, you can probably just install the packages for these things
+using the default settings, and everything should work.
 
-
+------
+Usage:
+------
+Try the following:
+Note there are some chains provided by default
+ - press "run"
+ - after a few seconds, press "pause"
+ - press "step" a bunch of times
+ - enter something like "0.2" in the tolerance box
+ - press "run" and wait for it to finish
+ - delete the tolerance and press "run" again
 
 
 -------
 License:
 -------
 
-Scallop is free software; you can redistribute it and/or modify
+scabble3d is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 3 of the License, or (at your
 option) any later version.
 
-Scallop is distributed in the hope that it will be useful, but
+scabble3d is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 License for more details.
 
 You should have received a copy of the GNU General Public License
 along with scallop.  If not, see http://www.gnu.org/licenses/.
-
 
 Because scabble uses the same strategy to compute scl as scallop, the same 
 comments on rigor are appropriate (and the same fix applicable):
@@ -49,24 +71,13 @@ Rigour:
 ------
 
 The algorithm that scallop uses to compute scl is rigorous
-for (finite linear combinations of) *alternating words*:
-those where the letters (cyclically) alternate between one
-of a,A and b,B. Hence: abAB is alternating, aaab is not, a is not.
+for (finite linear combinations of) (cyclically) *alternating words*:
+those where a generator never appears twice (or more) in a row. 
+Hence: abAB is alternating, aaab is not, a is not.
 
 For nonalternating input, scallop rigorously computes upper
 bounds on scl. Moreover, the output is "statistically" correct
 on *most* input, especially if the value of scl is small.
-
-To rigorously compute scl for nonalternating input, take any
-input w and replace it by f(w) where f rewrites letters as string
-by the substitution rule:
-
-	a -> aaa
-  b -> bbb
-
-After rewriting, scallop f(w) will rigorously compute scl(w) even
-if w is nonalternating. However, in practice, the computation is
-much slower, and runs into memory issues much sooner.
 
 
 
