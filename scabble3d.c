@@ -763,25 +763,40 @@ static gboolean configure(GtkWidget* area,
                           area->allocation.height,
                           -1);
   GdkGLConfig* glconfig;   
+  
+  if (VERBOSE) {
+    printf("About to create gl config\n");
+    fflush(stdout);
+  }
   glconfig = gdk_gl_config_new_by_mode(GDK_GL_MODE_RGB |
                                        GDK_GL_MODE_DEPTH |
                                        GDK_GL_MODE_SINGLE); 
                                        
   //this returns the GdkGLPixmap, but we don't care, because we can get it 
   //out later
+  if (VERBOSE) {
+    printf("About to create GLE pixmap from the gdk pixmap\n");
+    fflush(stdout);
+  }
   GLPixmap = gdk_pixmap_set_gl_capability(pixmap,
                                            glconfig,
                                            NULL);
   if (GLPixmap == NULL) {
     printf("Couldn't initialize opengl pixmap\n");
   }                                          
+  if (VERBOSE) {
+    printf("created opengl pixmap\n");
+    fflush(stdout);
+  }  
   
   GdkGLDrawable* gldrawable = gdk_pixmap_get_gl_drawable(pixmap);
   
+  if (VERBOSE) {printf("I'm about to create the opengl context\n"); fflush(stdout); }
   GLContext = gdk_gl_context_new(gldrawable,
                                  NULL,
                                  FALSE,
                                  GDK_GL_RGBA_TYPE);                                        
+  if (VERBOSE) {printf("made it\n"); fflush(stdout); }
   
   if (!gdk_gl_drawable_gl_begin(gldrawable, GLContext)) {
     printf("Couldn't start opengl drawing\n");
@@ -913,10 +928,7 @@ int main(int argc, char* argv[]) {
   GtkWidget* save_hbox;
   GtkWidget* dash_m5_check;
   
-  gtk_init(&argc, &argv);
-    
-  gdk_gl_init(&argc, &argv);  //gtkglext
-  
+ 
   //check if we're getting the -v option for verbosity
   if (argc>1) {
     if (strcmp(argv[1], "-v")==0) {
@@ -924,7 +936,19 @@ int main(int argc, char* argv[]) {
       printf("Looks like you want verbose output\n");
     }
   }
-   
+
+  gtk_init(&argc, &argv);
+    
+  if (VERBOSE) { 
+    printf("about to init opengl\n");
+    fflush(stdout);
+  }  
+  gdk_gl_init(&argc, &argv);  //gtkglext
+  if (VERBOSE) {
+    printf("inited opengl\n");
+    fflush(stdout);
+  }
+     
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   
   //make the main drawing area
