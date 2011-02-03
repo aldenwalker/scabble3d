@@ -24,6 +24,8 @@ typedef struct {
   GtkEntry* entry2;
   GtkEntry* entry3;
   GtkEntry* tol_entry;
+  GtkEntry* file;
+  GtkWidget* m5_check;
   GtkWidget* drawing;
 } fieldList;
 
@@ -371,6 +373,11 @@ void load_inputs_and_run(char* arg1,
                       solver,
                       target_drawing_area);
   
+  if (EGlobal != NULL) {
+    execution_free(EGlobal);
+    free(EGlobal);
+  }
+  
   EGlobal = E;
   
   for (i=0; i<3; i++) {
@@ -385,7 +392,7 @@ void load_inputs_and_run(char* arg1,
   for (i=0; i<4; i++) {
     GLmesh->triangles[i] = (tri_list*)malloc(sizeof(tri_list));
     GLmesh->vertices[i] = (vert_list_d*)malloc(sizeof(vert_list_d));
-    GLmesh->normals[i] = (vert_list_d*)malloc(sizeof(vert_list_d*));
+    GLmesh->normals[i] = (vert_list_d*)malloc(sizeof(vert_list_d));
     GLmesh->triangles[i]->num_tris = 0;
     GLmesh->triangles[i]->tris = NULL;
     GLmesh->vertices[i]->num_verts = 0;
@@ -438,7 +445,9 @@ static gboolean run_button_press(GtkWidget* widget,
     if (EGlobal == NULL || 
          (strcmp(EGlobal->initial_arguments[0], e1)!=0
           || strcmp(EGlobal->initial_arguments[1], e2)!=0
-          || strcmp(EGlobal->initial_arguments[2], e3)!=0)) {
+          || strcmp(EGlobal->initial_arguments[2], e3)!=0
+          || (EGlobal->maxjun == 5 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)))
+          || (EGlobal->maxjun == 4 && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check))) ) ) {
     
        if (strlen(e1) == 0
           || strlen(e2) == 0
@@ -446,13 +455,13 @@ static gboolean run_button_press(GtkWidget* widget,
         printf("You forgot a chain or something\n");
         return TRUE;
       }
-      printf("Looks like you want to restart a different computation\n"); fflush(stdout);
+      printf("Looks like you want to start a new computation\n"); fflush(stdout);
       double tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
       load_inputs_and_run((char*)gtk_entry_get_text(fields->entry1),
                           (char*)gtk_entry_get_text(fields->entry2),
                           (char*)gtk_entry_get_text(fields->entry3),
                           tolerance,
-                          4,
+                          (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fields->m5_check)) ? 5 : 4),
                           EXLP,
                           fields->drawing);
                           
@@ -460,6 +469,8 @@ static gboolean run_button_press(GtkWidget* widget,
     } else { //we already have an execution -- run it
       //make the tolerance whatever is in the box
       EGlobal->ball->tolerance = atof((char*)gtk_entry_get_text(fields->tol_entry));
+      printf("Loading new tolerance %f\n", EGlobal->ball->tolerance);
+      printf("from field with text %s\n", (char*)gtk_entry_get_text(fields->tol_entry));
       pthread_t worker_thread;
       EGlobal->one_step = 0;
       EGlobal->status_message = 0;
@@ -496,6 +507,88 @@ static gboolean step_button_press(GtkWidget* widget,
     EGlobal->one_step = 1;
     pthread_create(&worker_thread, NULL, run_execution, (void*)EGlobal);    
   }
+  return FALSE;
+}
+    
+static gboolean save_pov_button_press(GtkWidget* widget,
+                                      GdkEventButton* event,
+                                      fieldList* fields) {  
+  int i,orth;
+  double rotx, roty;
+  char* file_text = (char*)gtk_entry_get_text(fields->file);
+  if (event->type == GDK_BUTTON_PRESS || EGlobal == NULL) {
+    return FALSE;
+  } 
+  
+  sem_wait(&EGlobal->message_sem);
+  if (EGlobal->status == 1) {
+    sem_post(&EGlobal->message_sem);
+    return FALSE;
+  }
+  sem_post(&EGlobal->message_sem);
+  
+  FILE* out_file = fopen(file_text, "w");
+  if (out_file == NULL) {
+    printf("Doesn't look like I can open that file\n");
+    return FALSE;
+  }
+  fprintf(out_file, "#include \"colors.inc\"\n");
+  fprintf(out_file, "background { color White }\n");
+  fprintf(out_file, "camera {\n");
+  rotx = (3.1415926535/180.0)*dstatus.constant_rotation_x;
+  roty = (3.1415926535/180.0)*dstatus.constant_rotation_y;
+  fprintf(out_file, "\tlocation <%f, %f, %f>\n",  8*sin(-rotx),
+                                                  8*sin(-roty)*cos(rotx),
+                                                  8*cos(roty)*cos(rotx));
+  fprintf(out_file, "\tlook_at <0, 0, 0>\n");
+  fprintf(out_file, "\tright<-1.33, 0, 0>\n");
+  fprintf(out_file, "}\n");
+  fprintf(out_file, "light_source { <0, 0, 7> color White}\n");
+  fprintf(out_file, "light_source { <5, 0, -2> color White}\n");
+  fprintf(out_file, "light_source { <-5, 0, -2> color White}\n");
+  fprintf(out_file, "light_source { <10, 10, 10> color rgb<0.4, 0.4, 0.4>}\n");
+  fprintf(out_file, "cylinder {\n  <0,0,0>, <3, 0, 0>, 0.01\n  pigment { Red }\n}\n");
+  fprintf(out_file, "cylinder {\n  <0,0,0>, <0, 3, 0>, 0.01\n  pigment { Green }\n}\n");
+  fprintf(out_file, "cylinder {\n  <0,0,0>, <0, 0, 3>, 0.01\n  pigment { Blue }\n}\n");
+  
+  //got through all the orthants
+  for (orth=0; orth<8; orth++) {
+    //now, list the vertices
+    fprintf(out_file, "mesh2 {\n");
+    fprintf(out_file, "\tvertex_vectors {\n");
+    fprintf(out_file, "\t\t%d,\n", GLmesh->vertices[orth%4]->num_verts);
+    for (i=0; i<GLmesh->vertices[orth%4]->num_verts; i++) {
+      if (orth <4) {
+        fprintf(out_file, "\t\t<%f,%f,%f>,\n", GLmesh->vertices[orth%4]->verts[i][0],
+                                               GLmesh->vertices[orth%4]->verts[i][1],
+                                               GLmesh->vertices[orth%4]->verts[i][2]);
+      } else {
+        fprintf(out_file, "\t\t<%f,%f,%f>,\n", -GLmesh->vertices[orth%4]->verts[i][0],
+                                               -GLmesh->vertices[orth%4]->verts[i][1],
+                                               -GLmesh->vertices[orth%4]->verts[i][2]);
+      } 
+    }
+    fprintf(out_file, "\t}\n");
+    //and the triangles
+    fprintf(out_file, "\tface_indices {\n");
+    fprintf(out_file, "\t\t%d,\n", GLmesh->triangles[orth%4]->num_tris);
+    for (i=0; i<GLmesh->triangles[orth%4]->num_tris; i++) {
+      fprintf(out_file, "\t\t<%d,%d,%d>,\n", GLmesh->triangles[orth%4]->tris[i].verts[0],
+                                            GLmesh->triangles[orth%4]->tris[i].verts[1],
+                                            GLmesh->triangles[orth%4]->tris[i].verts[2]);
+                                            
+    }
+    fprintf(out_file, "\t}\n");
+    fprintf(out_file, "pigment {rgb 0.8}\n");
+    fprintf(out_file, "}\n");
+  }
+  fclose(out_file);
+  return FALSE;
+}
+
+static gboolean save_eps_button_press(GtkWidget* widget,
+                                      GdkEventButton* event,
+                                      fieldList* fields) {  
   return FALSE;
 }
     
@@ -553,7 +646,7 @@ static gboolean drawing_mouse_click(GtkWidget* area,
       dstatus.current_rotation_y = (area->allocation.height - event->y - dstatus.button1_down_y)/10;
       dstatus.constant_rotation_y += dstatus.current_rotation_y;
       dstatus.current_rotation_y = 0;
-      
+      printf("Current rotations: %f, %f\n", dstatus.constant_rotation_x, dstatus.constant_rotation_y);
       draw_mesh();
       gdk_window_invalidate_rect(area->window, &area->allocation, FALSE);
 	    gdk_window_process_updates(area->window, FALSE);
@@ -726,6 +819,12 @@ int main(int argc, char* argv[]) {
   GtkWidget* tol_label;
   GtkWidget* tolerance_entry;
   //GtkWidget* change_tol_button;
+  GtkWidget* file_entry;
+  GtkEntryBuffer* file_entry_text;
+  GtkWidget* save_pov_button;
+  GtkWidget* save_eps_button;
+  GtkWidget* save_hbox;
+  GtkWidget* dash_m5_check;
   
   gtk_init(&argc, &argv);
     
@@ -754,17 +853,25 @@ int main(int argc, char* argv[]) {
   run_button = gtk_button_new_with_label("run");
   pause_button = gtk_button_new_with_label("pause");
   step_button = gtk_button_new_with_label("step");
+  dash_m5_check = gtk_check_button_new_with_label("try harder (-m5)");
+  
   tol_entry_box = gtk_hbox_new(FALSE, 0);
   tol_text = gtk_entry_buffer_new(NULL, -1);
   tol_label = gtk_label_new("Tolerance:");
   tolerance_entry = gtk_entry_new_with_buffer(tol_text);
   //change_tol_button = gtk_button_new_with_label("change tol.");
+  file_entry_text = gtk_entry_buffer_new("", -1);
+  file_entry = gtk_entry_new_with_buffer(file_entry_text);
+  save_pov_button = gtk_button_new_with_label("save .pov");
+  save_eps_button = gtk_button_new_with_label("save .eps");
+  save_hbox = gtk_hbox_new(FALSE, 0);
   
   
   //build the sidebar
   gtk_box_pack_start(GTK_BOX(control_box), chain1_entry, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), chain2_entry, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), chain3_entry, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(control_box), dash_m5_check, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(tol_entry_box), tol_label, FALSE, FALSE, 0); 
   gtk_box_pack_start(GTK_BOX(tol_entry_box), tolerance_entry, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), tol_entry_box, FALSE, FALSE, 0);
@@ -772,6 +879,10 @@ int main(int argc, char* argv[]) {
   gtk_box_pack_start(GTK_BOX(run_pause_box), pause_button, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(run_pause_box), step_button, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(control_box), run_pause_box, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(control_box), file_entry, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(save_hbox), save_pov_button, TRUE, TRUE, 0);
+  //gtk_box_pack_start(GTK_BOX(save_hbox), save_eps_button, TRUE, TRUE, 0);
+  gtk_box_pack_start(GTK_BOX(control_box), save_hbox, FALSE, FALSE, 0);
   
   //put them together
   gtk_box_pack_start(GTK_BOX(hBox), drawing_area, TRUE, TRUE, 0);
@@ -823,6 +934,8 @@ int main(int argc, char* argv[]) {
   fields.entry2 = GTK_ENTRY(chain2_entry);
   fields.entry3 = GTK_ENTRY(chain3_entry);
   fields.tol_entry = GTK_ENTRY(tolerance_entry);
+  fields.m5_check = dash_m5_check;
+  fields.file = GTK_ENTRY(file_entry);
   fields.drawing = drawing_area;
   
   //run
@@ -859,6 +972,22 @@ int main(int argc, char* argv[]) {
   gtk_signal_connect(GTK_OBJECT(pause_button),
                      "button_release_event",
                      G_CALLBACK(pause_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(save_pov_button),
+                     "button_press_event",
+                     G_CALLBACK(save_pov_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(save_pov_button),
+                     "button_release_event",
+                     G_CALLBACK(save_pov_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(save_eps_button),
+                     "button_press_event",
+                     G_CALLBACK(save_eps_button_press),
+                     &fields);
+  gtk_signal_connect(GTK_OBJECT(save_eps_button),
+                     "button_release_event",
+                     G_CALLBACK(save_eps_button_press),
                      &fields);
   
   

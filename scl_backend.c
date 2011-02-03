@@ -46,6 +46,7 @@ void linear_program_from_ratmat(polygon* poly_list,
     LP* lp;
     int  result;
     char buf[100];
+    char row_equality;
     int varNum;
     int nCols = constraints->nC-1;
     int nRows = constraints->nR;
@@ -74,11 +75,17 @@ void linear_program_from_ratmat(polygon* poly_list,
     //the lp by default (set in lpstruct.c)
     //has all the right stuff, I think
     
+    for (i=0; i<constraints->nR; i++) {
+      printf("equality_type[%d] = %d\n", i, equality_type[i]);
+    }
+    
+    
     //now we input the rows -- it likes to name them
     for (i=0; i<constraints->nR; i++) {
       sprintf(buf, "r%d", i);
       lp_add_row(lp, buf);
-      lp_set_row_equality(lp, lp_get_row_num(lp, buf), (equality_type[i] == 0 ? 'E' : 'L'));
+      row_equality = (equality_type[i] == 0 ? 'E' : 'L');
+      lp_set_row_equality(lp, lp_get_row_num(lp, buf), row_equality);
     }
     
     //if (VERBOSE==1) {
@@ -414,6 +421,7 @@ void create_constraint_matrix(char*** chains,
       RatMat_set_int(constraints, offset+i, j, n, 1);
     }
     (*equalityType)[offset+i] = 0;
+    //printf("Set location %d in equalityType\n", offset+i);
     // note that these rows are == 0, which the last entry in the jth row already is
   }
   
@@ -447,6 +455,7 @@ void create_constraint_matrix(char*** chains,
                        weights[myWordNumber]*weights[firstWordNumber]);
       }
       (*equalityType)[offset] = 0;
+      //printf("Set location %d in equalityType\n", offset);
       //again, the right hand side is 0, so we don't need to set it
       offset++;
     }
@@ -1396,6 +1405,7 @@ void computation_init(execution* E,
   E->new_tolerance_check = 0;
   E->skip_orthant = 0;
   E->solver = solver;
+  E->maxjun = maxjun;
   E->ball = (ball_problem*)malloc(sizeof(ball_problem));
   E->ball->tolerance = tolerance;
   E->ball->num_chains = 3;
@@ -1490,8 +1500,77 @@ void execution_print(execution* E) {
   
   
   
+/*****************************************************************************/
+/* free the memory for all these types                                       */
+/*****************************************************************************/
+void scl_problem_free(scl_problem* sp) {
+  int i,j;
+  //free the chains
+  for (i=0; i<sp->num_chains; i++) {
+    for (j=0; j<sp->chain_lens[i]; j++) {
+      free(sp->chains[i][j]);
+    }
+    free(sp->chains[i]);
+  }
+  free(sp->chains);
+  free(sp->chain_lens);
   
+  //free the word list
+  for (i=0; i<sp->num_words; i++) {
+    free(sp->word_list[i]);
+  }
+  free(sp->word_list);
+  free(sp->weights);
   
+  //free the linear programming data
+  free(sp->equality_type);
+  RatMat_free(sp->constraints);
+  free(sp->constraints);
+  free(sp->arc_list);
+  for (i=0; i<sp->num_polys; i++) {
+    free(sp->poly_list[i].arc);
+  }
+  free(sp->poly_list);
+}
+
+  
+void orthant_problem_free(orthant_problem* orth) {
+  scl_problem_free(orth->scl_prob);
+  free(orth->scl_prob);
+  tri_list_free(orth->triangles);
+  free(orth->triangles);
+  vert_list_free(orth->vertices);
+  free(orth->vertices);
+}
+
+void ball_problem_free(ball_problem* ball) {
+  int i,j;  
+  for (i=0; i<ball->num_chains; i++) {
+    for (j=0; j<ball->chain_lens[i]; j++) {
+      free(ball->chains[i][j]);
+    }
+    free(ball->chains[i]);
+  }
+  free(ball->chains);
+  free(ball->chain_lens);
+  for (i=0; i<4; i++) {
+    orthant_problem_free(ball->orthants[i]);
+  }
+  free(ball->orthants);
+}
+
+void execution_free(execution* E) {
+  int i;
+  for (i=0; i<3; i++) {
+    free(E->initial_arguments[i]);
+  }
+  ball_problem_free(E->ball);
+  free(E->ball);
+  sem_destroy(&E->message_sem);
+  sem_destroy(&E->running_sem);
+  sem_destroy(&E->read_data_sem);
+}
+
   
   
   

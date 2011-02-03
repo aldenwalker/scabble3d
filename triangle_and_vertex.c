@@ -27,6 +27,15 @@ double dvector_dot(double* a, double* b) {
   return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 }
 
+
+
+
+
+
+
+/*****************************************************************************/
+/* triangle and triangle list functions                                      */
+/*****************************************************************************/
 double triangle_area(vert_list* V, triangle* T) {
   double side1[3];
   double side2[3];
@@ -53,9 +62,6 @@ double triangle_area(vert_list* V, triangle* T) {
 }
 
 
-
-
-
 void tri_list_add_copy(tri_list* T, triangle* t) {
   int i;
   T->tris = (triangle*)realloc((void*)(T->tris), (T->num_tris+1)*sizeof(triangle));
@@ -68,7 +74,6 @@ void tri_list_add_copy(tri_list* T, triangle* t) {
   T->tris[T->num_tris].is_scl_linear = t->is_scl_linear;
   T->num_tris++;
 }
-
 
 void tri_list_delete_index(tri_list* T, int index) {
   int i;
@@ -89,6 +94,59 @@ void tri_list_delete_indices(tri_list* T, int ind1, int ind2) {
   tri_list_delete_index(T, min_ind);
 }
 
+void tri_list_free(tri_list* T) {
+  int i;
+  for (i=0; i<T->num_tris; i++) {
+    free(T->tris[i].verts);
+  }
+  free(T->tris);
+}
+
+void tri_list_print(tri_list* T, vert_list* V) {
+  int i;
+  for (i=0; i<T->num_tris; i++) {
+    if (T->tris[i].is_scl_linear == 1) {
+      printf("*");
+    }
+    printf("(area %f) [%d,%d,%d] = ", T->tris[i].area, 
+                            T->tris[i].verts[0],
+                            T->tris[i].verts[1],
+                            T->tris[i].verts[2]);
+    rvector_print(&V->verts[T->tris[i].verts[0]]);
+    printf(", ");
+    rvector_print(&V->verts[T->tris[i].verts[1]]);
+    printf(", ");
+    rvector_print(&V->verts[T->tris[i].verts[2]]);
+    printf("\n");
+  }
+} 
+  
+void tri_list_print_d(tri_list* T, vert_list_d* V) {
+  int i;
+  for (i=0; i<T->num_tris; i++) {
+    if (T->tris[i].is_scl_linear == 1) {
+      printf("*");
+    }
+    printf("(area %f) [%d,%d,%d] = ", T->tris[i].area, 
+                            T->tris[i].verts[0],
+                            T->tris[i].verts[1],
+                            T->tris[i].verts[2]);
+    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[0]][0], 
+                          V->verts[T->tris[i].verts[0]][1], 
+                          V->verts[T->tris[i].verts[0]][2]);
+    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[1]][0], 
+                          V->verts[T->tris[i].verts[1]][1], 
+                          V->verts[T->tris[i].verts[1]][2]);
+    printf("[%f,%f,%f]\n", V->verts[T->tris[i].verts[2]][0], 
+                          V->verts[T->tris[i].verts[2]][1], 
+                          V->verts[T->tris[i].verts[2]][2]);
+
+  }
+}                         
+
+/*****************************************************************************/
+/* rational vector functions                                                 */
+/*****************************************************************************/
 void rvector_init(rvector* v, int len) {
   v->coord = (mpq_t*)malloc(len*sizeof(mpq_t));
   int i;
@@ -158,6 +216,11 @@ void rvector_print(rvector* v) {
   printf("]");
 }
 
+
+
+/*****************************************************************************/
+/* vertex list functions                                                     */
+/*****************************************************************************/
 void vert_list_add_copy(vert_list* V, rvector* v) {
   int i;
   printf("I'm adding a vertex\n");
@@ -167,7 +230,7 @@ void vert_list_add_copy(vert_list* V, rvector* v) {
   for (i=0; i<v->dim; i++) {
     mpq_set(V->verts[V->num_verts-1].coord[i], v->coord[i]);
   }
-  printf("Created vertex:\n");
+  //printf("Created vertex:\n");
   //rvector_print(&(V->verts[V->num_verts-1]));
   //printf("\n -- current list at %x\n", (int)V);
   //for (i=0; i<V->num_verts; i++) {
@@ -197,47 +260,27 @@ void vert_list_d_delete_index(vert_list_d* V, int ind) {
                                (V->num_verts)*sizeof(double*));
 }
   
-void tri_list_print(tri_list* T, vert_list* V) {
-  int i;
-  for (i=0; i<T->num_tris; i++) {
-    if (T->tris[i].is_scl_linear == 1) {
-      printf("*");
-    }
-    printf("(area %f) [%d,%d,%d] = ", T->tris[i].area, 
-                            T->tris[i].verts[0],
-                            T->tris[i].verts[1],
-                            T->tris[i].verts[2]);
-    rvector_print(&V->verts[T->tris[i].verts[0]]);
-    printf(", ");
-    rvector_print(&V->verts[T->tris[i].verts[1]]);
-    printf(", ");
-    rvector_print(&V->verts[T->tris[i].verts[2]]);
-    printf("\n");
-  }
-} 
   
-void tri_list_print_d(tri_list* T, vert_list_d* V) {
+void vert_list_free(vert_list* V) {
   int i;
-  for (i=0; i<T->num_tris; i++) {
-    if (T->tris[i].is_scl_linear == 1) {
-      printf("*");
-    }
-    printf("(area %f) [%d,%d,%d] = ", T->tris[i].area, 
-                            T->tris[i].verts[0],
-                            T->tris[i].verts[1],
-                            T->tris[i].verts[2]);
-    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[0]][0], 
-                          V->verts[T->tris[i].verts[0]][1], 
-                          V->verts[T->tris[i].verts[0]][2]);
-    printf("[%f,%f,%f], ", V->verts[T->tris[i].verts[1]][0], 
-                          V->verts[T->tris[i].verts[1]][1], 
-                          V->verts[T->tris[i].verts[1]][2]);
-    printf("[%f,%f,%f]\n", V->verts[T->tris[i].verts[2]][0], 
-                          V->verts[T->tris[i].verts[2]][1], 
-                          V->verts[T->tris[i].verts[2]][2]);
-
+  for (i=0; i<V->num_verts; i++) {
+    rvector_free(&V->verts[i]);
   }
-}                         
+  free(V->verts);
+}
+
+void vert_list_d_free(vert_list_d* V) {
+  int i;
+  for (i=0; i<V->num_verts; i++) {
+    free(V->verts[i]);
+  }
+  free(V->verts);
+}  
+  
+  
+  
+  
+
 
 
 

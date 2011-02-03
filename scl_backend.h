@@ -99,7 +99,9 @@ typedef struct {
   
   sem_t read_data_sem;     //this tells the gui thread to read the data
                            //note that the worker thread is waiting for this
-  char* initial_arguments[3];                         
+  char* initial_arguments[3];         
+  
+  int maxjun;           //whether or not we have -m5                
    
   GtkWidget* target_drawing_area; //this is the widget to draw to
   
@@ -199,7 +201,10 @@ void orthant_problem_print(orthant_problem* orth);
 void ball_problem_print(ball_problem* ball);
 void execution_print(execution* E);
 
-
+void scl_problem_free(scl_problem* sp);
+void orthant_problem_free(orthant_problem* orth);
+void ball_problem_free(ball_problem* ball);
+void execution_free(execution* E);
 
 
 #endif
